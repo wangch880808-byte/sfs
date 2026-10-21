@@ -1,0 +1,26 @@
+师砺平台（shili-platform）第三方来源与许可证说明
+
+本仓库在以下开源项目基础上改造，保留各自的许可证与版权声明：
+
+1. 后端 NUS-backend/
+   - 基于 ruoyi-vue-pro（芋道源码），MIT 许可证。
+     上游：https://github.com/YunaiV/ruoyi-vue-pro
+     许可证与版权声明：NUS-backend/LICENSE、NUS-backend/NOTICE
+   - 滑块验证码图片与组件来自 anji-captcha，Apache-2.0 许可证。
+
+2. 前端 NUS-front/
+   - 基于 Vue Vben Admin（vben5），MIT 许可证。
+     上游：https://github.com/vbenjs/vue-vben-admin
+     许可证与版权声明：NUS-front/LICENSE
+   - 管理端业务页面参考了芋道的 vben5 管理端（yudao-ui-admin-vben），MIT 许可证。
+   - 富文本编辑器 TinyMCE 7（自托管，目录 NUS-front/apps/web-antd/public/tinymce/），
+     GPL-2.0-or-later 许可证，见该目录下的 license.md。
+     本项目以自托管方式随前端分发，未修改其源代码。如需闭源再分发，请先评估 GPL 义务，
+     或改用 TinyMCE 商业授权。
+
+3. 本项目新增与修改的部分
+   由师砺平台贡献者维护，按各目录 LICENSE 中的 MIT 许可证提供。
+
+4. 依赖库
+   Maven、pnpm 依赖的许可证以各依赖包自带的声明为准，可用
+   `mvn license:aggregate-third-party-report`（后端）或 `pnpm licenses list`（前端）查看。

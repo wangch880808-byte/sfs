@@ -1,0 +1,44 @@
+# Git 钩子（lefthook）。在 NUS-front 执行 `pnpm install` 后，再执行一次
+# `pnpm --dir NUS-front exec lefthook install` 安装到本仓库。
+# 前端相关的检查只处理 NUS-front/ 下的暂存文件。
+
+pre-commit:
+  parallel: true
+  commands:
+    code-workspace:
+      run: pnpm vsh code-workspace --auto-commit
+      root: 'NUS-front/'
+    lint-md:
+      run: pnpm prettier --cache --ignore-unknown --write {staged_files}
+      root: 'NUS-front/'
+      glob: '*.md'
+    lint-vue:
+      run: pnpm prettier --write {staged_files} && pnpm eslint --cache --fix {staged_files} && pnpm stylelint --fix --allow-empty-input {staged_files}
+      root: 'NUS-front/'
+      glob: '*.vue'
+    lint-js:
+      run: pnpm prettier --cache --ignore-unknown --write {staged_files} && pnpm eslint --cache --fix {staged_files}
+      root: 'NUS-front/'
+      glob: '*.{js,jsx,ts,tsx}'
+    lint-style:
+      run: pnpm prettier --cache --ignore-unknown --write {staged_files} && pnpm stylelint --fix --allow-empty-input {staged_files}
+      root: 'NUS-front/'
+      glob: '*.{scss,less,styl,html,vue,css}'
+    lint-package:
+      run: pnpm prettier --cache --write {staged_files}
+      root: 'NUS-front/'
+      glob: 'package.json'
+    lint-json:
+      run: pnpm prettier --cache --write --parser json {staged_files}
+      root: 'NUS-front/'
+      glob: '{!(package)*.json,*.code-snippets,.!(browserslist)*rc}'
+
+post-merge:
+  commands:
+    install:
+      run: echo "依赖可能已变更，请按需在 NUS-front 下运行 pnpm install"
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm --dir NUS-front exec commitlint --edit "$(git rev-parse --absolute-git-dir)/COMMIT_EDITMSG"

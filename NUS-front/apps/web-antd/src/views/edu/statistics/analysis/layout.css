@@ -1,0 +1,71 @@
+/*
+ * 学情分析页（教学过程分析、教学问题研判、单项能力评测）的布局（V1.0.1.6 界面规范）：
+ * 页头之下依次是筛选条、指标卡、图表面板与清单，区块间距 24；面板两个一行，1280 宽以下一列。
+ */
+.analysis-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nus-section-gap);
+}
+
+/* 筛选条直接放在画布上，不套卡片 */
+.analysis-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nus-space-2);
+  align-items: center;
+}
+
+.analysis-filter__select {
+  width: 220px;
+  max-width: 100%;
+}
+
+.analysis-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--nus-section-gap);
+}
+
+@media (width >= 1280px) {
+  .analysis-row {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+
+  .analysis-row--even {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.analysis-chart {
+  width: 100%;
+  height: 320px;
+}
+
+.analysis-chart--tall {
+  height: 360px;
+}
+
+.analysis-chart--short {
+  height: 280px;
+}
+
+/* 面板里的小标题与辅助文字 */
+.analysis-subtitle {
+  margin: 0 0 var(--nus-space-3);
+  font-size: var(--nus-fs-dense);
+  font-weight: var(--nus-fw-medium);
+  line-height: var(--nus-lh-dense);
+  color: var(--nus-text-secondary);
+}
+
+.analysis-muted {
+  font-size: var(--nus-fs-dense);
+  line-height: var(--nus-lh-dense);
+  color: var(--nus-text-tertiary);
+}
+
+/* 清单里的数字用等宽数字 */
+.analysis-number {
+  font-variant-numeric: tabular-nums;
+}

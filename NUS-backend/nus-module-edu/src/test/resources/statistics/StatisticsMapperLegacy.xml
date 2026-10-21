@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="s.stat.legacy">
+    <!-- 有效任务范围：空学期可匹配，非空学期去首尾空格后比较。 -->
+    <sql id="visibleHomeworkScope">
+        AND EXISTS (SELECT 1 FROM edu_class visible_class
+            JOIN capacity_course visible_course ON visible_course.id = h.course_id
+                AND visible_course.deleted = 0 AND visible_course.status = 0
+            JOIN edu_class_course visible_binding ON visible_binding.class_id = h.class_id
+                AND visible_binding.course_id = h.course_id
+                AND visible_binding.deleted = 0 AND visible_binding.status = 0
+            WHERE visible_class.id = h.class_id
+                AND visible_class.deleted = 0 AND visible_class.status = 0
+                AND (TRIM(COALESCE(h.semester_name, '')) = ''
+                    OR TRIM(COALESCE(visible_binding.semester_name, '')) = ''
+                    OR TRIM(visible_binding.semester_name) = TRIM(h.semester_name)))
+    </sql>
+
+    <!-- 待审批公共课包含已归档课程。 -->
+    <select id="selectPendingPublicAuditCount" resultType="java.lang.Integer">
+        SELECT COUNT(*) FROM capacity_course
+        WHERE deleted = 0 AND is_public_course = 0 AND public_audit_status = 1
+    </select>
+
+    <!-- 总体合格率 -->
+    <select id="selectTotalPassRate" resultType="java.util.Map">
+        SELECT COUNT(*) AS totalRecords,
+               SUM(CASE WHEN hr.score &lt; h.pass_score THEN 1 ELSE 0 END) AS unqualifiedCount,
+               SUM(CASE WHEN hr.score &gt;= h.pass_score AND hr.score &lt; GREATEST(h.pass_score, h.score * #{goodRatio}) THEN 1 ELSE 0 END) AS qualifiedCount,
+               SUM(CASE WHEN hr.score &gt;= GREATEST(h.pass_score, h.score * #{goodRatio}) AND hr.score &lt; GREATEST(GREATEST(h.pass_score, h.score * #{goodRatio}), h.score * #{excellentRatio}) THEN 1 ELSE 0 END) AS goodCount,
+               SUM(CASE WHEN hr.score &gt;= GREATEST(GREATEST(h.pass_score, h.score * #{goodRatio}), h.score * #{excellentRatio}) THEN 1 ELSE 0 END) AS excellentCount
+        FROM edu_homework_record hr
+        JOIN edu_homework h ON hr.homework_id = h.id AND h.deleted = 0 AND h.status IN (1, 2) <include refid="visibleHomeworkScope"/>
+        WHERE hr.deleted = 0 AND hr.status = 2
+          AND h.status IN (1, 2)
+          <if test="teacherId != null">
+              AND h.teacher_id = #{teacherId}
+          </if>
+          <if test="classIds != null and classIds.size() > 0">
+              AND h.class_id IN
+              <foreach collection="classIds" item="cid" open="(" separator="," close=")">#{cid}</foreach>
+          </if>
+          <if test="courseId != null">
+              AND h.course_id = #{courseId}
+          </if>
+          <if test="academicYear != null">
+              AND COALESCE(NULLIF(TRIM(h.semester_name), ''),
+                  (SELECT TRIM(binding.semester_name) FROM edu_class_course binding
+                   WHERE binding.class_id = h.class_id AND binding.course_id = h.course_id
+                     AND binding.deleted = 0 AND binding.status = 0 LIMIT 1))
+                  LIKE CONCAT(#{academicYear}, '-', #{academicYear} + 1, '%')
+          </if>
+    </select>
+
+    <!-- 任务成绩趋势 -->
+    <select id="selectWorkTrend" resultType="java.util.Map">
+        SELECT h.id AS homeworkId, h.homework_name AS workName,
+               ROUND(AVG(hr.score), 1) AS avgScore,
+               MAX(hr.score) AS maxScore,
+               MIN(hr.score) AS minScore
+        FROM edu_homework h
+        JOIN edu_homework_record hr ON h.id = hr.homework_id AND hr.deleted = 0 AND hr.status = 2
+        WHERE h.deleted = 0 AND h.status IN (1, 2) <include refid="visibleHomeworkScope"/>
+          AND h.course_id = #{courseId}
+        <if test="classId != null">
+            AND h.class_id = #{classId}
+        </if>
+        GROUP BY h.id, h.homework_name, h.create_time
+        ORDER BY h.create_time ASC
+    </select>
+
+    <!-- 教师课程选项 -->
+    <select id="selectTeacherCourses" resultType="java.util.Map">
+        SELECT DISTINCT cc.id AS id, cc.course_name AS name
+        FROM capacity_course cc
+        WHERE cc.deleted = 0 AND cc.status = 0
+        <if test="teacherId != null">
+            AND (cc.teacher_Id = #{teacherId}
+                OR EXISTS (SELECT 1 FROM capacity_course_member team
+                    WHERE team.course_id = cc.id AND team.user_id = #{teacherId} AND team.deleted = 0))
+        </if>
+        ORDER BY cc.course_name
+    </select>
+
+    <!-- 课程下的班级选项 -->
+    <select id="selectCourseClasses" resultType="java.util.Map">
+        SELECT DISTINCT ec.id AS id, ec.class_name AS name
+        FROM edu_class_course ecc
+                 JOIN edu_class ec ON ecc.class_id = ec.id AND ec.deleted = 0 AND ec.status = 0
+                 JOIN capacity_course cc ON ecc.course_id = cc.id AND cc.deleted = 0 AND cc.status = 0
+        WHERE ecc.deleted = 0 AND ecc.status = 0
+          AND ecc.course_id = #{courseId}
+          <if test="teacherId != null">
+              AND cc.teacher_Id = #{teacherId}
+          </if>
+        ORDER BY ec.class_name
+    </select>
+
+    <!-- 按学院/专业查班级ID列表 -->
+    <select id="selectClassIdsByDept" resultType="java.lang.Long">
+        SELECT ec.id
+        FROM edu_class ec
+        JOIN system_dept d_major ON ec.dept_id = d_major.id AND d_major.deleted = 0
+        LEFT JOIN system_dept d_college ON d_major.parent_id = d_college.id AND d_college.deleted = 0
+        WHERE ec.deleted = 0 AND ec.status = 0
+          <if test="collegeId != null">
+              AND d_college.id = #{collegeId}
+          </if>
+          <if test="majorId != null">
+              AND d_major.id = #{majorId}
+          </if>
+    </select>
+
+    <!-- 课程分析：每个任务平均分 -->
+    <select id="selectCourseAnalysisAvg" resultType="java.util.Map">
+        SELECT h.id AS homeworkId, h.homework_name AS homeworkName,
+               ROUND(AVG(hr.score), 1) AS avgScore
+        FROM edu_homework h
+        JOIN edu_homework_record hr ON h.id = hr.homework_id AND hr.deleted = 0 AND hr.status = 2
+        WHERE h.deleted = 0 AND h.status IN (1, 2) <include refid="visibleHomeworkScope"/>
+        AND h.course_id = #{courseId}
+        <if test="classId != null">
+            AND h.class_id = #{classId}
+        </if>
+        GROUP BY h.id, h.homework_name, h.create_time
+        ORDER BY h.create_time ASC
+    </select>
+
+    <!-- 任务 top5 学生 -->
+    <select id="selectHomeworkTopStudents" resultType="java.util.Map">
+        SELECT hr.student_id AS studentId, su.nickname AS studentName, hr.score
+        FROM edu_homework_record hr
+        JOIN edu_homework h ON h.id = hr.homework_id AND h.deleted = 0 AND h.status IN (1, 2) <include refid="visibleHomeworkScope"/>
+        JOIN system_users su ON hr.student_id = su.id AND su.deleted = 0
+        WHERE hr.deleted = 0 AND hr.status = 2 AND hr.homework_id = #{homeworkId}
+        ORDER BY hr.score DESC
+        LIMIT 5
+    </select>
+
+    <!-- 任务 last5 学生 -->
+    <select id="selectHomeworkLastStudents" resultType="java.util.Map">
+        SELECT hr.student_id AS studentId, su.nickname AS studentName, hr.score
+        FROM edu_homework_record hr
+        JOIN edu_homework h ON h.id = hr.homework_id AND h.deleted = 0 AND h.status IN (1, 2) <include refid="visibleHomeworkScope"/>
+        JOIN system_users su ON hr.student_id = su.id AND su.deleted = 0
+        WHERE hr.deleted = 0 AND hr.status = 2 AND hr.homework_id = #{homeworkId}
+        ORDER BY hr.score ASC
+        LIMIT 5
+    </select>
+
+    <!-- 管理员看板：总学生数 -->
+    <select id="selectTotalStudents" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM system_users WHERE user_type = 2 AND deleted = 0 AND status = 0
+    </select>
+
+    <!-- 管理员看板：总教师数 -->
+    <select id="selectTotalTeachers" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM system_users WHERE user_type = 1 AND deleted = 0 AND status = 0
+    </select>
+
+    <!-- 管理员看板：总课程数 -->
+    <select id="selectTotalCourses" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM capacity_course WHERE deleted = 0 AND status = 0
+    </select>
+
+    <!-- 管理员看板：总任务数 -->
+    <select id="selectTotalHomeworks" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM edu_homework h WHERE h.deleted = 0 AND h.status IN (1, 2) <include refid="visibleHomeworkScope"/>
+    </select>
+
+    <!-- 看板：本周提交数 -->
+    <select id="selectWeekSubmissions" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM edu_homework_record hr
+        JOIN edu_homework h ON h.id = hr.homework_id AND h.deleted = 0 AND h.status IN (1, 2) <include refid="visibleHomeworkScope"/>
+        WHERE hr.deleted = 0 AND hr.status IN (1, 2, 4)
+          AND hr.create_time &gt;= DATE_SUB(CURDATE(), INTERVAL WEEKDAY(CURDATE()) DAY)
+        <if test="teacherId != null">
+            AND hr.homework_id IN (
+            SELECT id FROM edu_homework WHERE teacher_id = #{teacherId} AND deleted = 0
+            )
+        </if>
+    </select>
+
+    <!-- 看板：待批改数 -->
+    <select id="selectPendingCorrections" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM edu_homework_record hr
+        JOIN edu_homework h ON h.id = hr.homework_id AND h.deleted = 0 AND h.status IN (1, 2) <include refid="visibleHomeworkScope"/>
+        WHERE hr.deleted = 0 AND hr.status IN (1, 4)
+        <if test="teacherId != null">
+            AND hr.homework_id IN (SELECT id FROM edu_homework WHERE teacher_id = #{teacherId} AND deleted = 0)
+        </if>
+    </select>
+
+    <!-- 看板：已批改且有成功 AI 初评草案的记录份数 -->
+    <select id="selectAiCorrections" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM edu_homework_record hr
+        JOIN edu_homework h ON h.id = hr.homework_id AND h.deleted = 0 AND h.status IN (1, 2) <include refid="visibleHomeworkScope"/>
+        WHERE hr.deleted = 0 AND hr.status = 2 AND hr.score IS NOT NULL
+          AND EXISTS (SELECT 1 FROM edu_homework_ai_review ar
+              WHERE ar.homework_record_id = hr.id AND ar.deleted = 0 AND ar.status IN (2, 4, 5))
+    </select>
+
+    <!-- 教师看板：我的课程数 -->
+    <select id="selectTeacherCourseCount" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM capacity_course WHERE teacher_Id = #{teacherId} AND deleted = 0 AND status = 0
+    </select>
+
+    <!-- 教师看板：未读留言数 -->
+    <select id="selectUnreadMessages" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM edu_message m
+        WHERE m.type = 0 AND m.read_status = 0 AND m.deleted = 0
+          AND EXISTS (
+              SELECT 1 FROM edu_class_course cc
+              JOIN capacity_course c ON c.id = cc.course_id AND c.deleted = 0 AND c.status = 0
+              JOIN edu_class ec ON ec.id = cc.class_id AND ec.deleted = 0 AND ec.status = 0
+              WHERE cc.class_id = m.class_id AND cc.course_id = m.course_id AND cc.deleted = 0 AND cc.status = 0
+                AND (c.teacher_Id = #{teacherId}
+                    OR EXISTS (SELECT 1 FROM capacity_course_member team
+                        WHERE team.course_id = c.id AND team.user_id = #{teacherId} AND team.deleted = 0)
+                    OR EXISTS (SELECT 1 FROM edu_class_course_assistant assistant
+                        WHERE assistant.class_course_id = cc.id AND assistant.teacher_id = #{teacherId}
+                            AND assistant.deleted = 0))
+          )
+    </select>
+
+    <!-- 教师看板：最近任务 -->
+    <select id="selectRecentHomeworks" resultType="java.util.Map">
+        SELECT h.id AS homeworkId, h.homework_name AS homeworkName, h.status,
+               h.create_time AS createTime, cc.course_name AS courseName
+        FROM edu_homework h
+        JOIN capacity_course cc ON h.course_id = cc.id AND cc.deleted = 0 AND cc.status = 0
+        WHERE h.deleted = 0 AND h.status IN (1, 2) <include refid="visibleHomeworkScope"/> AND h.teacher_id = #{teacherId}
+        ORDER BY h.create_time DESC
+        LIMIT 5
+    </select>
+
+</mapper>

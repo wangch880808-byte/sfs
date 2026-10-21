@@ -1,0 +1,3 @@
+cn.nus.zknu.framework.datasource.config.NusDataSourceAutoConfiguration
+cn.nus.zknu.framework.mybatis.config.NusMybatisAutoConfiguration
+cn.nus.zknu.framework.translate.config.NusTranslateAutoConfiguration

@@ -1,0 +1,5 @@
+{
+  "note": "分批改文案期间的过渡基线（docs/ui-copy.md §4）：还没改到的地方允许留下的命中，每条是「文件｜规则｜命中｜原文」。由 node apps/web-antd/tests/copy/inventory.ts --write-baseline 生成；只许删、不许加，改完一处就重新生成。",
+  "rules": "nus-ui-copy-rules-v1",
+  "findings": []
+}

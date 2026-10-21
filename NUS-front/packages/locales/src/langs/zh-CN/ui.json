@@ -1,0 +1,168 @@
+{
+  "formRules": {
+    "required": "请输入{0}",
+    "selectRequired": "请选择{0}",
+    "minLength": "{0}至少 {1} 个字符",
+    "maxLength": "{0}最多 {1} 个字符",
+    "length": "{0}长度必须为 {1} 个字符",
+    "alreadyExists": "{0}「{1}」已存在",
+    "startWith": "{0}必须以 {1} 开头",
+    "invalidURL": "请输入有效的链接",
+    "mobile": "请输入正确的{0}",
+    "sizeLimit": "文件大小不能超过 {0} MB",
+    "previewWarning": "文件没有打开：没有可用的文件地址或预览地址。"
+  },
+  "actionTitle": {
+    "copy": "复制{0}",
+    "cancel": "取消{0}",
+    "edit": "修改{0}",
+    "create": "新建{0}",
+    "delete": "删除{0}",
+    "deleteBatch": "批量删除",
+    "detail": "{0}详情",
+    "view": "查看{0}",
+    "import": "导入",
+    "export": "导出"
+  },
+  "actionMessage": {
+    "deleteConfirm": "确定删除 {0} 吗？",
+    "deleteBatchConfirm": "确定删除所选项吗？",
+    "deleting": "正在删除 {0}…",
+    "deletingBatch": "正在删除所选项…",
+    "deleteSuccess": "{0} 删除成功",
+    "deleteFailed": "{0} 删除失败",
+    "operationSuccess": "操作成功",
+    "operationFailed": "操作失败",
+    "importSuccess": "导入成功",
+    "importFail": "导入失败",
+    "downloadTemplateFail": "下载模板失败",
+    "updating": "正在更新 {0}…",
+    "updateSuccess": "{0} 更新成功",
+    "updateFailed": "更新 {0} 失败",
+    "closing": "正在关闭 {0}…",
+    "closeSuccess": "{0} 关闭成功"
+  },
+  "placeholder": {
+    "input": "请输入",
+    "select": "请选择",
+    "upload": "点击上传"
+  },
+  "captcha": {
+    "title": "请完成安全验证",
+    "sliderSuccessText": "验证通过",
+    "sliderDefaultText": "请按住滑块拖动",
+    "sliderRotateDefaultTip": "点击图片可刷新",
+    "sliderTranslateDefaultTip": "点击图片可刷新",
+    "sliderRotateFailTip": "验证失败",
+    "sliderRotateSuccessTip": "验证成功，耗时 {0} 秒",
+    "sliderTranslateFailTip": "验证失败",
+    "sliderTranslateSuccessTip": "验证成功，耗时 {0} 秒",
+    "alt": "验证码图片",
+    "refreshAriaLabel": "刷新验证码",
+    "confirmAriaLabel": "确认选择",
+    "confirm": "确认",
+    "pointAriaLabel": "点击点",
+    "clickInOrder": "请依次点击"
+  },
+  "iconPicker": {
+    "placeholder": "选择一个图标",
+    "search": "搜索图标"
+  },
+  "jsonViewer": {
+    "copy": "复制",
+    "copied": "已复制"
+  },
+  "crop": {
+    "title": "图片裁剪",
+    "titleTip": "裁剪比例 {0}",
+    "confirm": "裁剪",
+    "cancel": "取消裁剪",
+    "errorTip": "裁剪错误"
+  },
+  "fallback": {
+    "pageNotFound": "没有找到这个页面",
+    "pageNotFoundDesc": "地址可能有误，或者页面已经下线。返回首页后从导航进入。",
+    "forbidden": "没有访问权限",
+    "forbiddenDesc": "你的账号没有这个页面的权限。需要开通时，请联系管理员。",
+    "internalError": "服务器出错",
+    "internalErrorDesc": "页面没有加载成功。稍后刷新重试，问题持续时请联系管理员。",
+    "offline": "离线页面",
+    "offlineError": "网络连接中断",
+    "offlineErrorDesc": "页面没有加载成功。检查网络连接后刷新重试。",
+    "comingSoon": "暂未开放",
+    "http": {
+      "requestTimeout": "请求没有成功：服务器响应超时。稍后重试。",
+      "networkError": "请求没有成功：网络连接中断。检查网络后重试。",
+      "mutationStatusUnknown": "请求结果未确认：网络中断或响应超时，数据可能已经提交。先刷新列表确认，不要重复提交。",
+      "badRequest": "请求没有成功：服务器无法处理这次请求。检查填写的内容后重试。",
+      "unauthorized": "请求没有成功：登录已过期。重新登录后继续。",
+      "forbidden": "请求没有成功：你没有这项操作的权限。需要开通时，请联系管理员。",
+      "notFound": "请求没有成功：要访问的内容不存在。刷新页面查看最新内容。",
+      "internalServerError": "请求没有成功：服务器出错。稍后重试。"
+    }
+  },
+  "widgets": {
+    "document": "文档",
+    "profile": "个人中心",
+    "qa": "问题与帮助",
+    "setting": "设置",
+    "logoutTip": "退出后需要重新登录才能继续使用。",
+    "viewAll": "查看全部通知",
+    "notifications": "通知",
+    "markAllAsRead": "全部标记为已读",
+    "clearNotifications": "清空",
+    "checkUpdatesTitle": "新版本可用",
+    "checkUpdatesDescription": "点击刷新以获取最新版本",
+    "search": {
+      "title": "搜索",
+      "searchNavigate": "搜索导航菜单",
+      "select": "选择",
+      "navigate": "导航",
+      "close": "关闭",
+      "noResults": "未找到搜索结果",
+      "noRecent": "没有搜索历史",
+      "recent": "搜索历史"
+    },
+    "lockScreen": {
+      "title": "锁定屏幕",
+      "screenButton": "锁定",
+      "password": "密码",
+      "placeholder": "请输入锁屏密码",
+      "unlock": "点击解锁",
+      "errorPasswordTip": "密码错误，请重新输入",
+      "backToLogin": "返回登录",
+      "entry": "进入系统"
+    },
+    "timezone": {
+      "setTimezone": "设置时区",
+      "setSuccess": "时区设置成功"
+    }
+  },
+  "upload": {
+    "upload": "上传",
+    "imgUpload": "上传图片",
+    "accept": "支持 {0} 格式",
+    "acceptUpload": "只能上传 {0} 格式的文件",
+    "maxSize": "单个文件不超过 {0} MB",
+    "maxSizeMultiple": "文件超过 {0} MB，没有上传。压缩或换一个文件后重试。",
+    "maxNumber": "最多只能上传 {0} 个文件",
+    "uploadSuccess": "上传成功",
+    "uploadError": "文件没有上传成功：原因未知。稍后重试。",
+    "imgUploading": "正在上传图片…"
+  },
+  "cropper": {
+    "selectImage": "选择图片",
+    "uploadSuccess": "上传成功",
+    "imageTooBig": "图片超过大小限制，换一张小一些的图片。",
+    "modalTitle": "上传头像",
+    "okText": "确认并上传",
+    "btn_reset": "重置",
+    "btn_rotate_left": "逆时针旋转",
+    "btn_rotate_right": "顺时针旋转",
+    "btn_scale_x": "水平翻转",
+    "btn_scale_y": "垂直翻转",
+    "btn_zoom_in": "放大",
+    "btn_zoom_out": "缩小",
+    "preview": "预览"
+  }
+}

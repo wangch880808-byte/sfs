@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.nus.zknu.module.edu.dal.mysql.student.StudentHomeworkMapper">
+    <!-- 有效任务范围：空学期可匹配，非空学期去首尾空格后比较。 -->
+    <sql id="visibleHomeworkScope">
+        AND EXISTS (SELECT 1 FROM edu_class visible_class
+            JOIN capacity_course visible_course ON visible_course.id = h.course_id
+                AND visible_course.deleted = 0 AND visible_course.status = 0
+            JOIN edu_class_course visible_binding ON visible_binding.class_id = h.class_id
+                AND visible_binding.course_id = h.course_id
+                AND visible_binding.deleted = 0 AND visible_binding.status = 0
+            WHERE visible_class.id = h.class_id
+                AND visible_class.deleted = 0 AND visible_class.status = 0
+                AND (TRIM(COALESCE(h.semester_name, '')) = ''
+                    OR TRIM(COALESCE(visible_binding.semester_name, '')) = ''
+                    OR TRIM(visible_binding.semester_name) = TRIM(h.semester_name)))
+    </sql>
+
+    <!--
+        历史可见（只读）：已发布、已截止，或任务已归档但学生提交过；不看班级、课程、班课是否归档。
+        需要 h（任务）、hr（本人提交记录，LEFT JOIN）两个别名，分配关系由调用方 JOIN edu_homework_assignee。
+    -->
+    <sql id="historyVisibleScope">
+        AND (h.status IN (1, 2) OR (h.status = 3 AND hr.id IS NOT NULL))
+    </sql>
+
+    <select id="selectHomeworkPage"
+            resultType="cn.nus.zknu.module.edu.controller.admin.student.vo.AppStudentHomeworkRespVO">
+        SELECT h.id AS homeworkId,
+               h.homework_name AS homeworkName,
+               h.homework_type AS homeworkType,
+               h.homework_level AS homeworkLevel,
+               h.course_id AS courseId,
+               c.course_name AS courseName,
+               h.deadline,
+               h.score,
+               h.pass_score AS passScore,
+               hr.id AS recordId,
+               COALESCE(hr.status, 0) AS status,
+               hr.score AS myScore,
+               hr.redo_deadline AS redoDeadline,
+               <choose><when test="history">1</when><otherwise>0</otherwise></choose> AS historyOnly
+        FROM edu_homework h
+        INNER JOIN edu_homework_assignee ha
+                ON ha.homework_id = h.id
+               AND ha.student_id = #{studentId}
+               AND ha.deleted = 0
+        LEFT JOIN edu_homework_record hr
+               ON hr.homework_id = h.id
+              AND hr.student_id = #{studentId}
+              AND hr.deleted = 0
+        INNER JOIN capacity_course c
+               ON c.id = h.course_id
+              AND c.deleted = 0
+              <if test="!history">AND c.status = 0</if>
+        INNER JOIN edu_class ec ON ec.id = h.class_id AND ec.deleted = 0
+              <if test="!history">AND ec.status = 0</if>
+        WHERE h.deleted = 0
+        <choose>
+            <when test="history">
+          <!-- 往期任务：历史可见，且不在当前可提交范围内 -->
+          <include refid="historyVisibleScope"/>
+          AND NOT (h.status IN (1, 2) <include refid="visibleHomeworkScope"/>)
+            </when>
+            <otherwise>
+          AND h.status IN (1, 2)
+          <include refid="visibleHomeworkScope"/>
+            </otherwise>
+        </choose>
+        <if test="courseId != null">
+          AND h.course_id = #{courseId}
+        </if>
+        <if test="status != null">
+            <choose>
+                <when test="status == 0">
+          AND hr.id IS NULL
+                </when>
+                <otherwise>
+          AND hr.status = #{status}
+                </otherwise>
+            </choose>
+        </if>
+        ORDER BY h.id DESC
+    </select>
+
+</mapper>

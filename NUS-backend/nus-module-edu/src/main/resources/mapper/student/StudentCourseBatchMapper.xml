@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.nus.zknu.module.edu.dal.mysql.student.StudentCourseBatchMapper">
+    <!-- 复用当前课程的可见范围，避免批量路径偏离空学期与归档口径。 -->
+    <sql id="currentStudentHomeworkScope">
+        FROM edu_homework h
+        INNER JOIN edu_homework_assignee ha ON ha.homework_id = h.id
+            AND ha.student_id = #{studentId} AND ha.deleted = 0
+        LEFT JOIN edu_homework_record hr ON h.id = hr.homework_id
+            AND hr.student_id = #{studentId} AND hr.deleted = 0
+        WHERE h.course_id IN
+        <foreach collection="courseIds" item="courseId" open="(" separator="," close=")">
+            #{courseId}
+        </foreach>
+        AND h.deleted = 0 AND h.status IN (1, 2)
+        <include refid="cn.nus.zknu.module.edu.dal.mysql.student.StudentCourseMapper.visibleHomeworkScope"/>
+    </sql>
+
+    <select id="selectCourseProgressBatch"
+            resultType="cn.nus.zknu.module.edu.dal.dataobject.student.StudentCourseProgressRow">
+        SELECT h.course_id AS courseId, COUNT(*) AS totalHomework,
+               SUM(CASE WHEN hr.status = 2 AND hr.score &gt;= h.pass_score THEN 1 ELSE 0 END) AS completedHomework,
+               AVG(CASE WHEN hr.score IS NOT NULL THEN hr.score END) AS avgScore
+        <include refid="currentStudentHomeworkScope"/>
+        GROUP BY h.course_id
+    </select>
+
+    <resultMap id="courseHomework" type="cn.nus.zknu.module.edu.dal.dataobject.student.StudentCourseHomeworkRow">
+        <id property="homeworkId" column="homeworkId"/>
+        <result property="courseId" column="courseId"/>
+        <association property="homework" javaType="cn.nus.zknu.module.edu.controller.admin.student.vo.AppStudentCourseDetailRespVO$Homework">
+            <result property="homeworkId" column="homeworkId"/>
+            <result property="homeworkName" column="homeworkName"/>
+            <result property="homeworkType" column="homeworkType"/>
+            <result property="homeworkLevel" column="homeworkLevel"/>
+            <result property="deadline" column="deadline"/>
+            <result property="status" column="status"/>
+            <result property="score" column="score"/>
+        </association>
+    </resultMap>
+    <select id="selectCourseHomeworksBatch" resultMap="courseHomework">
+        SELECT h.course_id AS courseId, h.id AS homeworkId, h.homework_name AS homeworkName,
+               h.homework_type AS homeworkType, h.homework_level AS homeworkLevel,
+               h.deadline, COALESCE(hr.status, 0) AS status, h.score
+        <include refid="currentStudentHomeworkScope"/>
+        ORDER BY h.id DESC
+    </select>
+</mapper>

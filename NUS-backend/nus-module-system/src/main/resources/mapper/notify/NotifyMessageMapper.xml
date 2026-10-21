@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.nus.zknu.module.system.dal.mysql.notify.NotifyMessageMapper">
+    <insert id="insertMessages">
+        INSERT INTO system_notify_message (user_id, user_type, template_id, template_code, template_type,
+            template_nickname, template_content, template_params, read_status, creator, updater, create_time, update_time, deleted)
+        VALUES <foreach collection="rows" item="row" separator=",">
+            (#{row.userId}, #{row.userType}, #{row.templateId}, #{row.templateCode}, #{row.templateType},
+             #{row.templateNickname}, #{row.templateContent},
+             #{row.templateParams,typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler},
+             #{row.readStatus}, COALESCE(#{operator,jdbcType=VARCHAR}, ''), COALESCE(#{operator,jdbcType=VARCHAR}, ''), NOW(), NOW(), 0)
+        </foreach>
+    </insert>
+</mapper>

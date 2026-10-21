@@ -1,0 +1,2 @@
+cn.nus.zknu.framework.quartz.config.NusQuartzAutoConfiguration
+cn.nus.zknu.framework.quartz.config.NusAsyncAutoConfiguration

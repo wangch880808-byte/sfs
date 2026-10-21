@@ -1,0 +1,90 @@
+/*
+ * 界面规范的非颜色 token（V1.0.1.6，参照 ScholarOS 科研外壳视觉规范）：字体、字号阶梯、间距、圆角、阴影、动效与外壳尺寸。
+ * 颜色 token 只在 palette.ts 里定义（浅色、深色两套，启动时写进页面）；这里的阴影引用颜色变量，不写颜色值。
+ * 新写的样式只用这里的字号、圆角与间距。
+ */
+:root {
+  /* 字体：不加网络字体，用系统字体栈；vben 与 Tailwind 的 font-sans 都读 --font-family */
+  --nus-font-sans:
+    -apple-system, blinkmacsystemfont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', arial, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+  --nus-font-mono:
+    ui-monospace, sfmono-regular, menlo, consolas, 'Liberation Mono', monospace;
+  --font-family: var(--nus-font-sans);
+
+  /* 字号阶梯（字号 / 行高）：大标题 24、页面标题 20、区块标题 15、正文 14、密集表格 13、辅助说明 12 */
+  --nus-fs-display: 24px;
+  --nus-lh-display: 32px;
+  --nus-fs-title: 20px;
+  --nus-lh-title: 28px;
+  --nus-fs-heading: 15px;
+  --nus-lh-heading: 22px;
+  --nus-fs-body: 14px;
+  --nus-lh-body: 22px;
+  --nus-fs-dense: 13px;
+  --nus-lh-dense: 20px;
+  --nus-fs-caption: 12px;
+  --nus-lh-caption: 18px;
+
+  /* 字重只用三档 */
+  --nus-fw-regular: 400;
+  --nus-fw-medium: 500;
+  --nus-fw-semibold: 600;
+
+  /* 间距：4px 栅格；页面内边距 24（1024 宽及以下 16）、区块间距 24、卡片内边距 20 */
+  --nus-space-1: 4px;
+  --nus-space-2: 8px;
+  --nus-space-3: 12px;
+  --nus-space-4: 16px;
+  --nus-space-5: 20px;
+  --nus-space-6: 24px;
+  --nus-space-8: 32px;
+  --nus-space-10: 40px;
+  --nus-page-padding: 24px;
+  --nus-section-gap: 24px;
+  --nus-card-padding: 20px;
+
+  /* 圆角四档：标签 4、按钮与输入框 6、卡片与表格 8、对话框与抽屉 12 */
+  --nus-radius-sm: 4px;
+  --nus-radius: 6px;
+  --nus-radius-lg: 8px;
+  --nus-radius-xl: 12px;
+  --nus-radius-full: 999px;
+
+  /* 阴影：卡片不用阴影（靠 1px 淡边框）；浮层用一圈淡边框加柔和投影 */
+  --nus-shadow-sm: 0 1px 2px var(--nus-shadow-color);
+  --nus-shadow-popover:
+    0 0 0 1px var(--nus-border-subtle), 0 8px 24px var(--nus-shadow-color);
+  --nus-shadow-dialog:
+    0 0 0 1px var(--nus-border-subtle), 0 16px 48px var(--nus-shadow-color);
+
+  /* 动效：颜色与底色 120ms，展开、抽屉、面板 180ms；减少动态效果时全部为 0 */
+  --nus-ease: cubic-bezier(0.2, 0, 0, 1);
+  --nus-dur-fast: 120ms;
+  --nus-dur: 180ms;
+  --nus-transition-colors:
+    color var(--nus-dur-fast) var(--nus-ease),
+    background-color var(--nus-dur-fast) var(--nus-ease),
+    border-color var(--nus-dur-fast) var(--nus-ease),
+    box-shadow var(--nus-dur-fast) var(--nus-ease),
+    opacity var(--nus-dur-fast) var(--nus-ease);
+
+  /* 外壳尺寸 */
+  --nus-topbar-height: 48px;
+  --nus-nav-width: 220px;
+}
+
+@media (width <= 1024px) {
+  :root {
+    --nus-page-padding: 16px;
+    --nus-card-padding: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --nus-dur-fast: 0ms;
+    --nus-dur: 0ms;
+  }
+}

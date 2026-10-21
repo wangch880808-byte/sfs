@@ -1,0 +1,70 @@
+/*
+ * vben 外壳与自带组件的样式补充（V1.0.1.6 界面规范）：顶栏、侧栏在画布上，导航项选中用选中底与主色字，
+ * 悬停用悬停底；颜色一律引用设计 token（--nus-*）。
+ */
+
+/* ---- 基础：数字等宽，列与列对得齐 ---- */
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 减少动态效果：过渡与动画全部关掉 ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/*
+ * vben 的实心主色块（主按钮、选中的搜索结果、复选框）改用实心底：深色下做文字的主色提亮后放不了白字；
+ * 浅色下实心底与主色相同。
+ */
+.bg-primary {
+  background-color: var(--nus-primary-fill);
+}
+
+.bg-primary[class~='hover:bg-primary/90']:hover {
+  background-color: var(--nus-primary-fill-hover);
+}
+
+/* ---- 导航菜单：次要文字色，悬停用悬停底，选中用选中底与主色字；项高 36、圆角 6 ---- */
+html body :is(.vben-menu, .vben-menu__popup-container):is(.is-dark, .is-light),
+html body .vben-menu.is-horizontal:is(.is-dark, .is-light) {
+  --menu-item-color: var(--nus-text-secondary);
+  --menu-item-hover-color: var(--nus-text);
+  --menu-item-hover-background-color: var(--nus-bg-hover);
+  --menu-item-active-color: var(--nus-primary);
+  --menu-item-active-background-color: var(--nus-bg-selected);
+  --menu-submenu-hover-color: var(--nus-text);
+  --menu-submenu-hover-background-color: var(--nus-bg-hover);
+  --menu-submenu-active-color: var(--nus-text);
+  --menu-submenu-active-background-color: transparent;
+}
+
+html body .vben-menu.is-rounded:not(.is-horizontal) {
+  --menu-item-height: 36px;
+  --menu-item-radius: var(--nus-radius);
+}
+
+/* ---- vben 自带的对话框与抽屉：浮层底与阴影，标题 15/600（与 ant-design-vue 对话框一致） ---- */
+.vben-modal {
+  box-shadow: var(--nus-shadow-dialog);
+}
+
+.vben-modal__title {
+  font-size: var(--nus-fs-heading);
+  font-weight: var(--nus-fw-semibold);
+  line-height: var(--nus-lh-heading);
+}
+
+/* ---- vben 表单标签：13px 次要文字，字重 400（输入框与内容保持正文色） ---- */
+.vben-form-label {
+  font-size: var(--nus-fs-dense);
+  font-weight: var(--nus-fw-regular);
+  color: var(--nus-text-secondary);
+}

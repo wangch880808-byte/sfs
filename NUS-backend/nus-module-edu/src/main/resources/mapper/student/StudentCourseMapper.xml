@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.nus.zknu.module.edu.dal.mysql.student.StudentCourseMapper">
+    <!-- 有效任务范围：空学期可匹配，非空学期去首尾空格后比较。 -->
+    <sql id="visibleHomeworkScope">
+        AND EXISTS (SELECT 1 FROM edu_class visible_class
+            JOIN capacity_course visible_course ON visible_course.id = h.course_id
+                AND visible_course.deleted = 0 AND visible_course.status = 0
+            JOIN edu_class_course visible_binding ON visible_binding.class_id = h.class_id
+                AND visible_binding.course_id = h.course_id
+                AND visible_binding.deleted = 0 AND visible_binding.status = 0
+            WHERE visible_class.id = h.class_id
+                AND visible_class.deleted = 0 AND visible_class.status = 0
+                AND (TRIM(COALESCE(h.semester_name, '')) = ''
+                    OR TRIM(COALESCE(visible_binding.semester_name, '')) = ''
+                    OR TRIM(visible_binding.semester_name) = TRIM(h.semester_name)))
+    </sql>
+
+    <!--
+        历史可见（只读）：已发布、已截止，或任务已归档但学生提交过；不看班级、课程、班课是否归档。
+        需要 h（任务）、hr（本人提交记录，LEFT JOIN）两个别名，分配关系由调用方 JOIN edu_homework_assignee。
+    -->
+    <sql id="historyVisibleScope">
+        AND (h.status IN (1, 2) OR (h.status = 3 AND hr.id IS NOT NULL))
+    </sql>
+
+    <!-- 按 history 参数选择口径：当前（可提交范围）或历史可见 -->
+    <sql id="homeworkScopeByMode">
+        <choose>
+            <when test="history">
+                <include refid="historyVisibleScope"/>
+            </when>
+            <otherwise>
+                AND h.status IN (1, 2)
+                <include refid="visibleHomeworkScope"/>
+            </otherwise>
+        </choose>
+    </sql>
+
+    <!-- 查询学生所在班级ID列表 -->
+    <select id="selectClassIdsByStudentId" resultType="java.lang.Long">
+        SELECT class_id
+        FROM edu_class_student
+        WHERE deleted = 0
+          AND student_id = #{studentId}
+          AND class_id IN (SELECT id FROM edu_class WHERE deleted = 0 AND status = 0)
+    </select>
+
+    <!-- 每门课先选出代表关联，避免认领人姓名改变课程去重口径；未认领行不能遮蔽历史认领人。 -->
+    <select id="selectCoursesByClassIds" resultType="cn.nus.zknu.module.edu.controller.admin.student.vo.AppStudentCourseRespVO">
+        SELECT cc.course_id AS courseId, c.course_name AS courseName,
+               c.course_image_url AS coverUrl, c.course_introduction AS description,
+               c.teacher_Id AS teacherId, teacher.nickname AS teacherName,
+               c.indicator_id AS indicatorId, indicator.indicator_name AS indicatorName
+        FROM (
+            SELECT binding.course_id, binding.claim_teacher_id,
+                   ROW_NUMBER() OVER (PARTITION BY binding.course_id ORDER BY
+                       CASE WHEN binding.claim_teacher_id IS NULL THEN 1 ELSE 0 END,
+                       CASE WHEN TRIM(binding.semester_name) = TRIM((SELECT cfg.`value` FROM infra_config cfg
+                           WHERE cfg.config_key = 'edu.current.semester.name' AND cfg.deleted = 0
+                           ORDER BY cfg.id DESC LIMIT 1)) THEN 0 ELSE 1 END,
+                       binding.id DESC) AS teacher_rank
+            FROM edu_class_course binding
+            JOIN edu_class ec ON binding.class_id = ec.id AND ec.deleted = 0 AND ec.status = 0
+            WHERE binding.class_id IN
+            <foreach collection="classIds" item="classId" open="(" separator="," close=")">
+                #{classId}
+            </foreach>
+            AND binding.deleted = 0 AND binding.status = 0
+        ) cc
+        JOIN capacity_course c ON cc.course_id = c.id AND c.deleted = 0 AND c.status = 0
+        LEFT JOIN system_users teacher ON teacher.id = CASE WHEN c.is_public_course = 0
+            THEN COALESCE(cc.claim_teacher_id, c.teacher_Id) ELSE c.teacher_Id END AND teacher.deleted = 0
+        LEFT JOIN capacity_indicator indicator ON indicator.id = c.indicator_id AND indicator.deleted = 0
+        WHERE cc.teacher_rank = 1
+    </select>
+
+    <!-- 查询单个课程详情 -->
+    <select id="selectCourseDetail" resultType="cn.nus.zknu.module.edu.controller.admin.student.vo.AppStudentCourseDetailRespVO">
+        SELECT c.id AS courseId, c.course_name AS courseName,
+               c.course_image_url AS coverUrl, c.course_introduction AS description,
+               c.teacher_Id AS teacherId, teacher.nickname AS teacherName,
+               c.indicator_id AS indicatorId, indicator.indicator_name AS indicatorName
+        FROM capacity_course c
+        LEFT JOIN system_users teacher ON teacher.id = c.teacher_Id AND teacher.deleted = 0
+        LEFT JOIN capacity_indicator indicator ON indicator.id = c.indicator_id AND indicator.deleted = 0
+        WHERE c.id = #{courseId} AND c.deleted = 0
+        <if test="!includeArchived">AND c.status = 0</if>
+    </select>
+
+    <select id="existsStudentCourseHistory" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM edu_homework h
+            INNER JOIN edu_homework_assignee ha
+                    ON ha.homework_id = h.id
+                   AND ha.student_id = #{studentId}
+                   AND ha.deleted = 0
+            INNER JOIN capacity_course c ON c.id = h.course_id AND c.deleted = 0
+            LEFT JOIN edu_homework_record hr
+                   ON hr.homework_id = h.id
+                  AND hr.student_id = #{studentId}
+                  AND hr.deleted = 0
+            WHERE h.course_id = #{courseId}
+              AND h.deleted = 0
+              <include refid="historyVisibleScope"/>
+        )
+    </select>
+
+    <select id="existsStudentCourse" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1
+            FROM edu_class_student cs
+            INNER JOIN edu_class_course cc
+                    ON cc.class_id = cs.class_id
+                   AND cc.course_id = #{courseId}
+                   AND cc.deleted = 0
+                   AND cc.status = 0
+            INNER JOIN edu_class ec ON ec.id = cc.class_id AND ec.deleted = 0 AND ec.status = 0
+            INNER JOIN capacity_course c ON c.id = cc.course_id AND c.deleted = 0 AND c.status = 0
+            WHERE cs.student_id = #{studentId}
+              AND cs.deleted = 0
+        )
+    </select>
+
+    <select id="selectCourseHomeworks"
+            resultType="cn.nus.zknu.module.edu.controller.admin.student.vo.AppStudentCourseDetailRespVO$Homework">
+        SELECT h.id AS homeworkId,
+               h.homework_name AS homeworkName,
+               h.homework_type AS homeworkType,
+               h.homework_level AS homeworkLevel,
+               h.deadline,
+               COALESCE(hr.status, 0) AS status,
+               h.score
+        FROM edu_homework h
+        INNER JOIN edu_homework_assignee ha
+                ON ha.homework_id = h.id
+               AND ha.student_id = #{studentId}
+               AND ha.deleted = 0
+        LEFT JOIN edu_homework_record hr
+               ON hr.homework_id = h.id
+              AND hr.student_id = #{studentId}
+              AND hr.deleted = 0
+        WHERE h.course_id = #{courseId}
+          AND h.deleted = 0
+          <include refid="homeworkScopeByMode"/>
+        ORDER BY h.id DESC
+    </select>
+
+    <!--
+        等级闯关：分配给学生的初、中、高级任务逐条列出，由服务层按规则计算分母、分子与待批改数。
+        personalDeadline、redoDeadline 供服务层按 HomeworkDeadlineUtils 的口径算学生的实际截止时间。
+        lastCorrectScore 取评分轨迹中最近一次批改或成绩册导入的分数，打回、重交期间据此保留上一次成绩；
+        教师在撤销期内撤销了的批改不算（edu_homework_grading_action.notify_status = 2，
+        即 EduHomeworkGradingActionEnum.NOTIFY_UNDONE，只在撤销成功提交时写入）。
+    -->
+    <select id="selectLevelTasks" resultType="cn.nus.zknu.module.edu.dal.dataobject.student.StudentLevelTaskRow">
+        SELECT h.id AS homeworkId,
+               h.homework_level AS homeworkLevel,
+               h.deadline AS deadline,
+               h.pass_score AS passScore,
+               h.score AS fullScore,
+               (SELECT MAX(ext.deadline) FROM edu_homework_extension ext
+                 WHERE ext.homework_id = h.id AND ext.student_id = #{studentId}
+                   AND ext.deleted = 0) AS personalDeadline,
+               hr.id AS recordId,
+               hr.status AS recordStatus,
+               hr.redo_deadline AS redoDeadline,
+               hr.score AS recordScore,
+               (SELECT hh.score FROM edu_homework_record_history hh
+                 WHERE hh.record_id = hr.id AND hh.deleted = 0 AND hh.event_type IN ('CORRECT', 'GRADEBOOK_IMPORT')
+                   AND NOT EXISTS (SELECT 1 FROM edu_homework_grading_action ga
+                                    WHERE ga.record_id = hr.id AND ga.history_id = hh.id
+                                      AND ga.notify_status = 2 AND ga.deleted = 0)
+                 ORDER BY hh.id DESC LIMIT 1) AS lastCorrectScore
+        FROM edu_homework h
+        INNER JOIN edu_homework_assignee ha ON ha.homework_id = h.id
+            AND ha.student_id = #{studentId} AND ha.deleted = 0
+        LEFT JOIN edu_homework_record hr ON h.id = hr.homework_id AND hr.student_id = #{studentId} AND hr.deleted = 0
+        WHERE h.course_id = #{courseId}
+          AND h.homework_level IN (1, 2, 3)
+          AND h.deleted = 0
+          <include refid="homeworkScopeByMode"/>
+        ORDER BY h.homework_level, h.id
+    </select>
+
+    <!-- 等级闯关：学生当前所在班级在这门课已发布的各等级任务数（判断某一等级在这门课里是否存在） -->
+    <select id="selectClassLevelTaskCounts" resultType="java.util.Map">
+        SELECT h.homework_level AS homeworkLevel, COUNT(*) AS taskCount
+        FROM edu_homework h
+        WHERE h.course_id = #{courseId}
+          AND h.homework_level IN (1, 2, 3)
+          AND h.status IN (1, 2)
+          AND h.deleted = 0
+          AND h.class_id IN (SELECT cs.class_id FROM edu_class_student cs
+                             WHERE cs.student_id = #{studentId} AND cs.deleted = 0)
+          <include refid="visibleHomeworkScope"/>
+        GROUP BY h.homework_level
+    </select>
+
+    <!-- 按课程统计学生任务进度 -->
+    <select id="selectCourseProgress" resultType="java.util.Map">
+        SELECT COUNT(*) AS totalHomework,
+               SUM(CASE WHEN hr.status = 2 AND hr.score >= h.pass_score THEN 1 ELSE 0 END) AS completedHomework,
+               AVG(CASE WHEN hr.score IS NOT NULL THEN hr.score END) AS avgScore
+        FROM edu_homework h
+        INNER JOIN edu_homework_assignee ha ON ha.homework_id = h.id
+            AND ha.student_id = #{studentId} AND ha.deleted = 0
+        LEFT JOIN edu_homework_record hr ON h.id = hr.homework_id AND hr.student_id = #{studentId} AND hr.deleted = 0
+        WHERE h.course_id = #{courseId}
+          AND h.deleted = 0
+          <include refid="homeworkScopeByMode"/>
+    </select>
+
+</mapper>

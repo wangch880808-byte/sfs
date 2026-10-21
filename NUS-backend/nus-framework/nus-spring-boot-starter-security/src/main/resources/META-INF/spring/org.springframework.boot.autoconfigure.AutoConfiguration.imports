@@ -1,0 +1,3 @@
+cn.nus.zknu.framework.security.config.NusSecurityAutoConfiguration
+cn.nus.zknu.framework.security.config.NusWebSecurityConfigurerAdapter
+cn.nus.zknu.framework.operatelog.config.NusOperateLogConfiguration

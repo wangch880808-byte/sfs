@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.nus.zknu.module.edu.dal.mysql.homework.EduHomeworkRecordPageMapper">
+    <select id="selectOwnedRecords" resultType="cn.nus.zknu.module.edu.dal.dataobject.homework.EduHomeworkRecordDO">
+        SELECT r.* FROM edu_homework_record r
+        JOIN edu_homework h ON h.id = r.homework_id AND h.deleted = 0
+        WHERE r.deleted = 0 AND h.teacher_id = #{teacherId}
+        <choose>
+            <when test="correction">
+                <choose>
+                    <when test="req.status == null">AND r.status IN (1, 2, 3, 4)</when>
+                    <when test="req.status == 1">AND r.status IN (1, 4)</when>
+                    <otherwise>AND r.status = #{req.status}</otherwise>
+                </choose>
+            </when>
+            <otherwise>
+                <if test="req.studentId != null">AND r.student_id = #{req.studentId}</if>
+                <if test="req.status != null">AND r.status = #{req.status}</if>
+            </otherwise>
+        </choose>
+        <choose>
+            <when test="correction">ORDER BY r.status ASC, r.submit_time ASC, r.id ASC</when>
+            <otherwise>ORDER BY r.id DESC</otherwise>
+        </choose>
+    </select>
+
+    <select id="selectRanks" resultType="cn.nus.zknu.module.edu.dal.mysql.homework.EduHomeworkRecordPageMapper$RankRow">
+        SELECT homework_id, student_id, score,
+               RANK() OVER (PARTITION BY homework_id ORDER BY score DESC) AS `rank`,
+               COUNT(*) OVER (PARTITION BY homework_id) AS total
+        FROM edu_homework_record
+        WHERE deleted = 0 AND status = 2 AND homework_id IN
+        <foreach collection="homeworkIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+</mapper>

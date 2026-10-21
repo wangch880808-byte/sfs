@@ -1,0 +1,2 @@
+cn.nus.zknu.framework.redis.config.NusRedisAutoConfiguration
+cn.nus.zknu.framework.redis.config.NusCacheAutoConfiguration

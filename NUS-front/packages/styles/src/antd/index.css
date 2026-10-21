@@ -1,0 +1,234 @@
+/*
+ * ant-design-vue 组件的样式补充（V1.0.1.6 界面规范）。
+ * 颜色、圆角、字号、控件高度由 ConfigProvider 的 token 决定（apps/web-antd/src/styles/theme/antd.ts），
+ * 这里只补 token 做不到的部分；颜色一律引用设计 token（--nus-*），不写颜色值，也不用 !important。
+ */
+
+.ant-app {
+  width: 100%;
+  height: 100%;
+  overscroll-behavior: none;
+  color: inherit;
+}
+
+.ant-btn {
+  /* 字重 500 */
+  font-weight: var(--nus-fw-medium);
+
+  .anticon {
+    display: inline-flex;
+  }
+
+  /* * 修复按钮添加图标时的位置问题 */
+  > svg {
+    display: inline-block;
+  }
+
+  > svg + span {
+    margin-inline-start: 6px;
+  }
+}
+
+.ant-tag {
+  > svg {
+    display: inline-block;
+  }
+
+  > svg + span {
+    margin-inline-start: 4px;
+  }
+}
+
+/* ---- 按钮：主按钮不加投影 ---- */
+.ant-btn.ant-btn-primary,
+.ant-btn.ant-btn-primary.ant-btn-dangerous {
+  box-shadow: none;
+}
+
+/*
+ * 主按钮与危险主按钮用实心底：深色下做文字的主色提亮后放不了白字，实心底单独取色（浅色下与主色相同）；
+ * 悬停与按下向黑加深。按钮的悬停文字与实心底在 ant-design-vue 里共用一个 token，所以在这里补。
+ */
+.ant-btn.ant-btn-primary:not(
+    :disabled,
+    .ant-btn-background-ghost,
+    .ant-btn-dangerous
+  ) {
+  background-color: var(--nus-primary-fill);
+
+  &:hover {
+    background-color: var(--nus-primary-fill-hover);
+  }
+
+  &:active {
+    background-color: var(--nus-primary-fill-active);
+  }
+}
+
+.ant-btn.ant-btn-primary.ant-btn-dangerous:not(
+    :disabled,
+    .ant-btn-background-ghost
+  ) {
+  background-color: var(--nus-danger-fill);
+
+  &:hover {
+    background-color: var(--nus-danger-fill-hover);
+  }
+
+  &:active {
+    background-color: var(--nus-danger-fill-active);
+  }
+}
+
+/* 实心单选按钮（选中项是实心底）同理：放白字的底用实心色；描边样式的选中项仍用主色做文字 */
+.ant-radio-group.ant-radio-group-solid
+  .ant-radio-button-wrapper-checked:not(.ant-radio-button-wrapper-disabled) {
+  background-color: var(--nus-primary-fill);
+  border-color: var(--nus-primary-fill);
+
+  &:hover {
+    background-color: var(--nus-primary-fill-hover);
+    border-color: var(--nus-primary-fill-hover);
+  }
+
+  &:active {
+    background-color: var(--nus-primary-fill-active);
+    border-color: var(--nus-primary-fill-active);
+  }
+}
+
+/* ---- 表单校验失败：vben 表单给出错的项加 form-valid-error 类，输入控件改用危险色边框与焦点环 ---- */
+.form-valid-error {
+  .ant-select:not(.valid-success, .ant-select-customize-input)
+    .ant-select-selector:not(.valid-success),
+  .ant-input:not(.valid-success),
+  .ant-input-affix-wrapper:not(.valid-success),
+  .ant-input-number:not(.valid-success),
+  .ant-picker:not(.valid-success) {
+    border-color: var(--nus-danger);
+  }
+
+  .ant-select.ant-select-focused:not(
+      .ant-select-disabled,
+      .ant-select-customize-input,
+      .valid-success
+    )
+    .ant-select-selector,
+  .ant-input-affix-wrapper.ant-input-affix-wrapper-focused,
+  .ant-input:focus,
+  .ant-input-number.ant-input-number-focused,
+  .ant-picker.ant-picker-focused {
+    box-shadow: 0 0 0 2px var(--nus-danger-tint-hover);
+  }
+
+  .ant-picker .ant-picker-active-bar {
+    background-color: var(--nus-danger);
+  }
+}
+
+/* ---- 卡片：1px 淡边框、无阴影；标题 15/600（字号来自组件 token） ---- */
+.ant-card {
+  box-shadow: none;
+
+  .ant-card-head {
+    min-height: 52px;
+    padding: 0 var(--nus-card-padding);
+  }
+
+  .ant-card-body {
+    padding: var(--nus-card-padding);
+  }
+
+  .ant-card-extra {
+    color: var(--nus-text-secondary);
+  }
+}
+
+.ant-card.ant-card-small {
+  .ant-card-head {
+    min-height: 44px;
+    padding: 0 var(--nus-space-4);
+  }
+
+  .ant-card-body {
+    padding: var(--nus-space-4);
+  }
+}
+
+/* ---- 页签：字重 500，选中下划线 2px ---- */
+.ant-tabs .ant-tabs-tab {
+  font-weight: var(--nus-fw-medium);
+  transition: var(--nus-transition-colors);
+}
+
+.ant-tabs .ant-tabs-tab:not(.ant-tabs-tab-active) .ant-tabs-tab-btn {
+  color: var(--nus-text-secondary);
+}
+
+.ant-tabs .ant-tabs-tab:not(.ant-tabs-tab-active):hover .ant-tabs-tab-btn {
+  color: var(--nus-text);
+}
+
+/* ---- 表格：表头凹陷底、12/500 辅助色；行悬停用悬停底；不要竖线 ---- */
+.ant-table-wrapper .ant-table {
+  .ant-table-thead > tr > th,
+  .ant-table-thead > tr > td {
+    font-size: var(--nus-fs-caption);
+    font-weight: var(--nus-fw-medium);
+    color: var(--nus-text-secondary);
+  }
+
+  .ant-table-thead > tr > th::before {
+    display: none;
+  }
+
+  .ant-table-tbody > tr.ant-table-row:hover > td,
+  .ant-table-tbody > tr > td.ant-table-cell-row-hover {
+    background: var(--nus-bg-hover);
+  }
+}
+
+/* ---- 描述列表：标签用凹陷底与次要文字 ---- */
+.ant-descriptions .ant-descriptions-item-label {
+  color: var(--nus-text-secondary);
+}
+
+.ant-descriptions.ant-descriptions-bordered .ant-descriptions-item-label {
+  font-weight: var(--nus-fw-medium);
+}
+
+/* ---- 对话框与抽屉：圆角 12（对话框，来自组件 token）、标题 15/600 ---- */
+.ant-modal .ant-modal-title,
+.ant-drawer .ant-drawer-title {
+  font-weight: var(--nus-fw-semibold);
+}
+
+/* ---- 提示条：常驻说明用轻提示，图标承担颜色 ---- */
+.ant-alert {
+  align-items: flex-start;
+}
+
+.ant-alert .ant-alert-icon {
+  margin-top: 3px;
+}
+
+/* ---- 统计数值与空状态 ---- */
+.ant-statistic .ant-statistic-title {
+  margin-bottom: var(--nus-space-1);
+  font-size: var(--nus-fs-dense);
+  color: var(--nus-text-secondary);
+}
+
+.ant-statistic .ant-statistic-content {
+  font-variant-numeric: tabular-nums;
+  color: var(--nus-text);
+}
+
+.ant-empty .ant-empty-description {
+  color: var(--nus-text-tertiary);
+}
+
+/* ---- 链接按钮：表格操作列里不加粗 ---- */
+.ant-btn.ant-btn-link {
+  font-weight: var(--nus-fw-regular);
+}

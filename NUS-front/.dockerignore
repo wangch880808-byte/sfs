@@ -1,0 +1,7 @@
+**/node_modules
+**/dist
+**/dist.zip
+**/.turbo
+.git
+.gitignore
+*.md

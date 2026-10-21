@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.nus.zknu.module.edu.dal.mysql.aireview.EduHomeworkAiReviewMapper">
+    <select id="selectLatestByRecordIds" resultType="cn.nus.zknu.module.edu.dal.dataobject.aireview.EduHomeworkAiReviewDO">
+        SELECT ar.id, ar.homework_record_id, ar.status, ar.ai_score, ar.ai_comment, ar.ai_confidence
+        FROM edu_homework_ai_review ar
+        JOIN (
+            SELECT homework_record_id, MAX(id) AS id
+            FROM edu_homework_ai_review
+            WHERE deleted = 0 AND homework_record_id IN
+            <foreach collection="recordIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            GROUP BY homework_record_id
+        ) latest ON latest.id = ar.id
+        WHERE ar.deleted = 0
+    </select>
+</mapper>

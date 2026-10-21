@@ -1,0 +1,158 @@
+/*
+ * vxe-table 跟随界面规范的设计 token（V1.0.1.6）：表头凹陷底、12/500 次要文字色，行高 40，行悬停用悬停底，
+ * 选中行用选中底，边框用淡边框，圆角 8；深浅色由 --nus-* 变量切换。
+ */
+:root .vxe-grid {
+  --vxe-ui-font-color: var(--nus-text);
+  --vxe-ui-font-primary-color: var(--nus-primary);
+  --vxe-ui-font-lighten-color: var(--nus-text-tertiary);
+  --vxe-ui-font-darken-color: var(--nus-text-secondary);
+  --vxe-ui-font-disabled-color: var(--nus-text-disabled);
+  --vxe-ui-font-primary-tinge-color: var(--nus-primary);
+  --vxe-ui-font-primary-lighten-color: var(--nus-primary-hover);
+  --vxe-ui-font-primary-darken-color: var(--nus-primary);
+
+  /* base */
+  --vxe-ui-border-radius: var(--nus-radius-sm);
+  --vxe-ui-base-popup-border-color: var(--nus-border-subtle);
+  --vxe-ui-base-popup-box-shadow: var(--nus-shadow-popover);
+  --vxe-ui-input-border-color: var(--nus-border);
+  --vxe-ui-input-disabled-color: var(--nus-text-disabled);
+  --vxe-ui-layout-background-color: var(--nus-bg-surface);
+  --vxe-ui-loading-background-color: var(--nus-mask);
+
+  /* table */
+  --vxe-ui-table-border-radius: var(--nus-radius-lg);
+  --vxe-ui-table-border-color: var(--nus-border-subtle);
+  --vxe-ui-table-resizable-line-color: var(--nus-border);
+  --vxe-ui-table-header-background-color: var(--nus-bg-sunken);
+  --vxe-ui-table-header-font-color: var(--nus-text-secondary);
+  --vxe-ui-table-header-font-weight: var(--nus-fw-medium);
+  --vxe-ui-table-footer-background-color: var(--nus-bg-sunken);
+  --vxe-ui-table-row-height-small: 40px;
+  --vxe-ui-table-row-hover-background-color: var(--nus-bg-hover);
+  --vxe-ui-table-row-striped-background-color: var(--nus-bg-sunken);
+  --vxe-ui-table-row-hover-striped-background-color: var(--nus-bg-hover);
+  --vxe-ui-table-row-radio-checked-background-color: var(--nus-bg-selected);
+  --vxe-ui-table-row-hover-radio-checked-background-color: var(
+    --nus-primary-tint-hover
+  );
+  --vxe-ui-table-row-checkbox-checked-background-color: var(--nus-bg-selected);
+  --vxe-ui-table-row-hover-checkbox-checked-background-color: var(
+    --nus-primary-tint-hover
+  );
+  --vxe-ui-table-row-current-background-color: var(--nus-bg-selected);
+  --vxe-ui-table-row-hover-current-background-color: var(
+    --nus-primary-tint-hover
+  );
+
+  height: auto !important;
+}
+
+/* 表头文字 12px；数字列等宽 */
+.vxe-grid .vxe-header--column {
+  font-size: var(--nus-fs-caption);
+}
+
+.vxe-grid .vxe-table--body {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 行悬停与选中的底色过渡 */
+.vxe-grid .vxe-body--row > .vxe-body--column {
+  transition: background-color var(--nus-dur-fast) var(--nus-ease);
+}
+
+.vxe-pager {
+  .vxe-pager--prev-btn:not(.is--disabled):active,
+  .vxe-pager--next-btn:not(.is--disabled):active,
+  .vxe-pager--num-btn:not(.is--disabled):active,
+  .vxe-pager--jump-prev:not(.is--disabled):active,
+  .vxe-pager--jump-next:not(.is--disabled):active,
+  .vxe-pager--prev-btn:not(.is--disabled):focus,
+  .vxe-pager--next-btn:not(.is--disabled):focus,
+  .vxe-pager--num-btn:not(.is--disabled):focus,
+  .vxe-pager--jump-prev:not(.is--disabled):focus,
+  .vxe-pager--jump-next:not(.is--disabled):focus {
+    color: var(--nus-text);
+    background-color: var(--nus-bg-hover);
+    border: 1px solid var(--nus-border);
+    box-shadow: 0 0 0 2px var(--nus-focus-ring);
+  }
+
+  .vxe-pager--wrapper {
+    display: flex;
+    align-items: center;
+  }
+
+  .vxe-pager--sizes {
+    margin-right: auto;
+  }
+}
+
+.vxe-pager--wrapper {
+  @apply justify-center md:justify-end;
+}
+
+.vxe-tools--operate {
+  margin-right: 0.25rem;
+  margin-left: 0.75rem;
+}
+
+.vxe-table-custom--checkbox-option:hover {
+  background: none !important;
+}
+
+.vxe-toolbar {
+  padding: 0;
+}
+
+.vxe-buttons--wrapper:not(:empty),
+.vxe-tools--operate:not(:empty),
+.vxe-tools--wrapper:not(:empty) {
+  padding: 0.6em 0;
+}
+
+.vxe-tools--operate:not(:has(button)) {
+  margin-left: 0;
+}
+
+.vxe-grid--layout-header-wrapper {
+  overflow: visible;
+}
+
+.vxe-grid--layout-body-content-wrapper {
+  overflow: hidden;
+}
+
+/* 必填字段错误样式 */
+.vxe-table .required-field-error::after {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  z-index: 10;
+  padding: 1px 4px;
+  font-size: var(--nus-fs-caption);
+  line-height: 1;
+  color: var(--nus-on-fill);
+  content: '必填';
+  background-color: var(--nus-danger-fill);
+  border-radius: 0 0 0 var(--nus-radius-sm);
+}
+
+/* 必填字段内的输入框样式 */
+.vxe-table
+  .required-field-error
+  .ant-select:not(.ant-select-disabled)
+  .ant-select-selector,
+.vxe-table .required-field-error .ant-input-number,
+.vxe-table .required-field-error .ant-input {
+  border-color: var(--nus-danger);
+}
+
+/* 工具栏的搜索开关：展开时用选中底与主色图标，不用主色实心圆 */
+.vxe-grid .vxe-button.is-search-active {
+  color: var(--nus-primary);
+  background-color: var(--nus-bg-selected);
+  border-color: var(--nus-bg-selected);
+}

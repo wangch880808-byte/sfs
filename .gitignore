@@ -1,0 +1,29 @@
+# 本地发布材料、验收输出、上传数据：不入库
+/releases/
+/outputs/
+**/.upload/
+
+# 系统与编辑器
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Python
+__pycache__/
+*.pyc
+.venv*/
+
+# 本地配置与密钥：只提交 *.example
+.env
+*.env
+!*.env.example
+!NUS-front/apps/*/.env
+!NUS-front/apps/*/.env.*
+
+# 本地模型、智能体工作文件
+models/
+.claude/settings.local.json
+
+# 后端在仓库目录启动时可能按相对路径写出的目录
+nested:/

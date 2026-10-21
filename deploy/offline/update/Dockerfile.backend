@@ -1,0 +1,9 @@
+ARG BASE_IMAGE=nus-backend:current
+FROM ${BASE_IMAGE}
+
+# The jar no longer defaults to a profile; production images always run with prod.
+ENV SPRING_PROFILES_ACTIVE=prod
+USER root
+COPY nus-server.jar /nus-server/app.jar
+RUN chown 10001:10001 /nus-server/app.jar
+USER 10001

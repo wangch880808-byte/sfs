@@ -1,0 +1,70 @@
+/*
+  批改工作台右栏子组件共用的区块样式（V1.0.1.6 界面规范）：区块标题、说明、凹陷块与操作行。
+  由 correct.vue 在脚本里引入（全局样式），选择器都挂在 .grading-detail 下，不影响其他页面。
+*/
+.grading-detail .grading-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--nus-space-3);
+  min-width: 0;
+}
+
+.grading-detail .grading-section__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nus-space-2) var(--nus-space-3);
+  align-items: center;
+}
+
+.grading-detail .grading-section__title {
+  margin: 0;
+  font-size: var(--nus-fs-body);
+  font-weight: var(--nus-fw-semibold);
+  line-height: var(--nus-lh-body);
+  color: var(--nus-text);
+}
+
+.grading-detail .grading-section__count {
+  margin-left: var(--nus-space-1);
+  font-weight: var(--nus-fw-regular);
+  font-variant-numeric: tabular-nums;
+  color: var(--nus-text-tertiary);
+}
+
+.grading-detail .grading-section__action {
+  margin-left: auto;
+}
+
+.grading-detail .grading-note {
+  margin: 0;
+  font-size: var(--nus-fs-dense);
+  line-height: var(--nus-lh-dense);
+  color: var(--nus-text-tertiary);
+}
+
+.grading-detail .grading-caption {
+  margin: 0;
+  font-size: var(--nus-fs-caption);
+  line-height: var(--nus-lh-caption);
+  color: var(--nus-text-tertiary);
+}
+
+.grading-detail .grading-text {
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+/* 凹陷块：卡片里分组用凹陷底，不再套卡片 */
+.grading-detail .grading-sunken {
+  padding: var(--nus-space-3);
+  margin: 0;
+  background: var(--nus-bg-sunken);
+  border-radius: var(--nus-radius-lg);
+}
+
+.grading-detail .grading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--nus-space-2);
+  align-items: center;
+}

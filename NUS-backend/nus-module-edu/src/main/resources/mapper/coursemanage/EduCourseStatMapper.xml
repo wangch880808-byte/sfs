@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.nus.zknu.module.edu.dal.mysql.coursemanage.EduCourseStatMapper">
+    <sql id="homeworkIds">
+        <choose>
+            <when test="homeworkIds != null and homeworkIds.size() > 0">
+                <foreach collection="homeworkIds" item="id" open="(" close=")" separator=",">#{id}</foreach>
+            </when>
+            <otherwise>(NULL)</otherwise>
+        </choose>
+    </sql>
+    <!-- 原过滤先转换为 Set，关联前去重可避免历史重复分配放大提交统计。 -->
+    <sql id="assignedStudents">
+        SELECT DISTINCT homework_id, student_id FROM edu_homework_assignee
+        WHERE deleted = 0 AND homework_id IN <include refid="homeworkIds"/>
+    </sql>
+    <select id="selectAssigneeCounts" resultType="cn.nus.zknu.module.edu.dal.mysql.coursemanage.EduCourseStatMapper$HomeworkCount">
+        SELECT homework_id, COUNT(*) AS student_count FROM edu_homework_assignee
+        WHERE deleted = 0 AND homework_id IN <include refid="homeworkIds"/>
+        GROUP BY homework_id
+    </select>
+    <select id="selectRecordStats" resultType="cn.nus.zknu.module.edu.dal.mysql.coursemanage.EduCourseStatMapper$HomeworkStat">
+        SELECT r.homework_id,
+               SUM(CASE WHEN r.status &gt;= 1 THEN 1 ELSE 0 END) AS submitted_count,
+               SUM(CASE WHEN r.status = 2 THEN 1 ELSE 0 END) AS corrected_count,
+               SUM(r.score) AS score_total, COUNT(r.score) AS score_count
+        FROM edu_homework_record r
+        JOIN (<include refid="assignedStudents"/>) a
+          ON a.homework_id = r.homework_id AND a.student_id = r.student_id
+        WHERE r.deleted = 0 AND r.homework_id IN <include refid="homeworkIds"/>
+        GROUP BY r.homework_id
+    </select>
+    <select id="selectClassStudentCounts" resultType="cn.nus.zknu.module.edu.dal.mysql.coursemanage.EduCourseStatMapper$ClassCount">
+        SELECT class_id, COUNT(*) AS student_count FROM edu_class_student
+        WHERE deleted = 0 AND class_id IN
+        <choose>
+            <when test="classIds != null and classIds.size() > 0">
+                <foreach collection="classIds" item="id" open="(" close=")" separator=",">#{id}</foreach>
+            </when>
+            <otherwise>(NULL)</otherwise>
+        </choose>
+        GROUP BY class_id
+    </select>
+    <select id="selectAssignedRecords" resultType="cn.nus.zknu.module.edu.dal.dataobject.homework.EduHomeworkRecordDO">
+        SELECT r.homework_id, r.student_id, r.status, r.score
+        FROM edu_homework_record r
+        JOIN (<include refid="assignedStudents"/>) a
+          ON a.homework_id = r.homework_id AND a.student_id = r.student_id
+        WHERE r.deleted = 0 AND r.homework_id IN <include refid="homeworkIds"/>
+    </select>
+    <!-- 任务统计按学生去重，课程任务卡按记录计数，两种原有口径不能合并。 -->
+    <select id="selectHomeworkStatistics" resultType="cn.nus.zknu.module.edu.dal.mysql.coursemanage.EduCourseStatMapper$HomeworkStat">
+        SELECT COUNT(DISTINCT a.student_id) AS total_count,
+               COUNT(DISTINCT CASE WHEN r.status &gt;= 1 THEN r.student_id END) AS submitted_count,
+               COUNT(DISTINCT CASE WHEN r.status = 2 THEN r.student_id END) AS corrected_count,
+               COUNT(DISTINCT CASE WHEN r.status = 3 THEN r.student_id END) AS redo_count,
+               COUNT(DISTINCT CASE WHEN r.score &gt;= #{passScore} THEN r.student_id END) AS pass_count,
+               SUM(r.score) AS score_total, COUNT(r.score) AS score_count,
+               MAX(r.score) AS max_score, MIN(r.score) AS min_score
+        FROM (SELECT DISTINCT student_id FROM edu_homework_assignee
+              WHERE deleted = 0 AND homework_id = #{homeworkId} AND student_id IS NOT NULL) a
+        LEFT JOIN edu_homework_record r
+          ON r.homework_id = #{homeworkId} AND r.student_id = a.student_id AND r.deleted = 0
+    </select>
+</mapper>

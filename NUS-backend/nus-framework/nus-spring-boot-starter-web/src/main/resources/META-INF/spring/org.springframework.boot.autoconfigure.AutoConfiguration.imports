@@ -1,0 +1,7 @@
+cn.nus.zknu.framework.apilog.config.NusApiLogAutoConfiguration
+cn.nus.zknu.framework.jackson.config.NusJacksonAutoConfiguration
+cn.nus.zknu.framework.swagger.config.NusSwaggerAutoConfiguration
+cn.nus.zknu.framework.web.config.NusWebAutoConfiguration
+cn.nus.zknu.framework.xss.config.NusXssAutoConfiguration
+cn.nus.zknu.framework.banner.config.NusBannerAutoConfiguration
+cn.nus.zknu.framework.encrypt.config.NusApiEncryptAutoConfiguration

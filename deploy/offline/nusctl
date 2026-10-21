@@ -1,0 +1,317 @@
+#!/bin/sh
+set -eu
+SCRIPT=$0
+while [ -L "$SCRIPT" ]; do
+  target=$(readlink "$SCRIPT")
+  case "$target" in
+    /*) SCRIPT=$target ;;
+    *) SCRIPT=$(dirname "$SCRIPT")/$target ;;
+  esac
+done
+ROOT=$(cd -- "$(dirname "$SCRIPT")" && pwd)
+# Physical directory of this nusctl: stays valid when the current pointer moves during a rollback.
+SELF_DIR=$(cd -P -- "$ROOT" && pwd)
+export NUS_RELEASE_ROOT="$ROOT"
+# shellcheck source=lib/common.sh
+. "$ROOT/lib/common.sh"
+require_root
+[ -f "$CONFIG_ROOT/.env" ] || die 'installation not found'
+load_env "$CONFIG_ROOT/.env"
+# Compose describes the release that current points at, also when this nusctl comes from an upgrade package.
+[ ! -f "$DATA_ROOT/current/runtime/compose.yaml" ] || COMPOSE_FILE="$DATA_ROOT/current/runtime/compose.yaml"
+
+usage() {
+  cat >&2 <<'EOF'
+usage: nusctl start|stop|restart|status|doctor|monitor-status|monitor-restart|monitor-credentials
+       nusctl logs [service] [--follow] [--since VALUE] [--error] [--trace-id ID]
+       nusctl backup [--db-only]
+       nusctl restore FILE [--yes] [--no-safety-backup]
+       nusctl rollback previous|VERSION [--backup FILE] [--env FILE] [--yes] [--no-safety-backup]
+EOF
+  exit 2
+}
+
+assume_yes=false
+safety_backup=true
+confirm() {
+  [ "$assume_yes" = false ] || return 0
+  [ -t 0 ] || die "$1; rerun with --yes to confirm without a terminal"
+  printf '%s\nType yes to continue: ' "$1" >&2
+  answer=
+  read -r answer || true
+  [ "$answer" = yes ] || die 'cancelled; nothing was changed'
+}
+absolute_path() {
+  case "$1" in
+    /*) printf '%s' "$1" ;;
+    *) printf '%s/%s' "$(pwd)" "$1" ;;
+  esac
+}
+# Runs one step of a restore or rollback; on failure prints what to do and stops. Every step is safe to repeat.
+step() {
+  step_label=$1
+  shift
+  log "--> $step_label"
+  # A plain command, not "&&"/"||": there the shell would ignore the errexit of the subshell.
+  set +e
+  ( set -e; "$@" )
+  step_status=$?
+  set -e
+  [ "$step_status" -ne 0 ] || return 0
+  log "FAILED (exit $step_status): $step_label"
+  log 'The platform is stopped. Fix the cause shown above, then repeat (safe to run again):'
+  log "  $RETRY_COMMAND"
+  [ -z "${SAFETY_BACKUP_FILE:-}" ] || log "Safety backup of the database as it was before: $SAFETY_BACKUP_FILE"
+  exit 1
+}
+take_safety_backup() {
+  if [ "$safety_backup" = true ]; then
+    log '--> safety backup of the current database'
+    SAFETY_BACKUP_FILE=$(run_db_backup) || {
+      log 'FAILED: safety backup; nothing was restored. Start the platform again with: sudo nusctl start'
+      exit 1
+    }
+    log "Safety backup: $SAFETY_BACKUP_FILE"
+  else
+    log 'Safety backup skipped (--no-safety-backup)'
+  fi
+}
+
+# Keep run_db_backup unchanged: upgrades, restore and rollback capture its stdout.
+cmd_backup() {
+  db_only=false
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --db-only) db_only=true ;;
+      *) die "不支持的 backup 参数：$1" ;;
+    esac
+    shift
+  done
+  backup_timestamp=$(date -u +%Y%m%dT%H%M%SZ)
+  db_file=$(run_db_backup) || die '数据库备份失败，未执行附件和配置备份'
+  if [ "$db_only" = true ]; then
+    printf '%s\n' "$db_file"
+    return 0
+  fi
+  file_paths=$(UPLOADS_DIR="$DATA_ROOT/data/uploads" ENV_FILE="$CONFIG_ROOT/.env" \
+    BACKUP_DIR="$DATA_ROOT/backups" TIMESTAMP="$backup_timestamp" "$ROOT/lib/backup-files.sh") || {
+    die "附件或配置备份失败；数据库备份已成功：${db_file}。请修复后重新执行完整备份"
+  }
+  files_file=$(printf '%s\n' "$file_paths" | sed -n '1p')
+  env_file=$(printf '%s\n' "$file_paths" | sed -n '2p')
+  log "完整备份完成（本次备份开始时间：${backup_timestamp}）"
+  for backup_file in "$db_file" "$files_file" "$env_file"; do
+    backup_size=$(wc -c < "$backup_file" | tr -d '[:space:]')
+    log "  ${backup_file}（$backup_size 字节）"
+  done
+  log '异地拷贝时三份备份及各自的 .sha256 一起拷；env-*.env 含密钥，异地保存时要加密'
+}
+
+# nusctl restore FILE: stop writers, safety backup, drop + recreate + import, clear caches, start, health checks.
+cmd_restore() {
+  file=
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --yes) assume_yes=true ;;
+      --no-safety-backup) safety_backup=false ;;
+      -*) die "unsupported restore option: $1" ;;
+      *) [ -z "$file" ] || die 'restore takes one backup file'; file=$1 ;;
+    esac
+    shift
+  done
+  [ -n "$file" ] || die 'usage: nusctl restore FILE [--yes] [--no-safety-backup]'
+  file=$(absolute_path "$file")
+  run_db_restore --check "$file"
+  confirm "Replace database $NUS_DB_NAME with $file? Changes made after that backup are lost; backend and frontend stop during the restore."
+  RETRY_COMMAND="sudo '$SELF_DIR/nusctl' restore '$file' --no-safety-backup --yes"
+  step 'stop backend and frontend' stop_writers
+  take_safety_backup
+  step "restore $file (drop, recreate, import)" run_db_restore "$file"
+  step 'clear the Redis caches of the restored database' clear_restored_db_caches
+  step 'start backend and frontend, health checks' start_apps
+  log "Restore completed: database $NUS_DB_NAME now holds $file; backend and frontend are healthy"
+}
+
+# Release directory name for "previous", a release directory name or a RELEASE_VERSION.
+resolve_release() {
+  wanted=$1
+  if [ -f "$DATA_ROOT/releases/$wanted/release.env" ]; then
+    printf '%s\n' "$wanted"
+    return 0
+  fi
+  matches=$(find "$DATA_ROOT/releases" -mindepth 2 -maxdepth 2 -name release.env 2>/dev/null | sort \
+    | while IFS= read -r manifest; do
+        [ "$(release_value "$manifest" RELEASE_VERSION)" != "$wanted" ] || basename "$(dirname "$manifest")"
+      done)
+  case "$matches" in
+    '') die "no installed release $wanted in $DATA_ROOT/releases (available: $(list_releases))" ;;
+    *'
+'*) die "several release directories hold $wanted; name one of: $(printf '%s' "$matches" | tr '\n' ' ')" ;;
+  esac
+  printf '%s\n' "$matches"
+}
+list_releases() {
+  find "$DATA_ROOT/releases" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sed 's#.*/##' | sort | tr '\n' ' '
+}
+print_rollback_candidates() {
+  log "Installed releases: $(list_releases)"
+  log 'Saved .env files (newest first):'
+  find "$CONFIG_ROOT" -maxdepth 1 -name '.env.before-*' 2>/dev/null | sort -r | head -n 5 | sed 's/^/[nus]   /'
+  log 'Database backups (newest first):'
+  find "$DATA_ROOT/backups" -maxdepth 1 -name '*.sql.gz' 2>/dev/null | sort -r | head -n 5 | sed 's/^/[nus]   /'
+}
+
+# nusctl rollback previous|VERSION: return to an installed release together with the database backup and .env
+# saved by the upgrade that left it. Data written since that backup is lost (a safety backup is taken first).
+cmd_rollback() {
+  wanted=
+  db_backup=
+  env_backup_file=
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --yes) assume_yes=true ;;
+      --no-safety-backup) safety_backup=false ;;
+      --backup) shift; [ "$#" -gt 0 ] || die '--backup requires a file'; db_backup=$(absolute_path "$1") ;;
+      --env) shift; [ "$#" -gt 0 ] || die '--env requires a file'; env_backup_file=$(absolute_path "$1") ;;
+      -*) die "unsupported rollback option: $1" ;;
+      *) [ -z "$wanted" ] || die 'rollback takes one release'; wanted=$1 ;;
+    esac
+    shift
+  done
+  [ -n "$wanted" ] || die 'usage: nusctl rollback previous|VERSION [--backup FILE] [--env FILE] [--yes] [--no-safety-backup]'
+  current_link=$(current_release_link)
+  current_id=${current_link##*/}
+  [ -n "$current_id" ] || die "$DATA_ROOT/current does not name a release"
+  record=
+  if [ "$wanted" = previous ]; then
+    record=$(find_upgrade_record TO_RELEASE "$current_id")
+    if [ -z "$record" ]; then
+      print_rollback_candidates
+      die "no completed upgrade to $current_id is recorded in $(upgrade_record_dir) (it was installed by an older upgrade.sh); name the release and pass --backup and --env from the lists above"
+    fi
+    target_id=$(release_value "$record" FROM_RELEASE)
+    [ -n "$target_id" ] || die "upgrade record $record does not name the previous release"
+  else
+    target_id=$(resolve_release "$wanted")
+    record=$(find_upgrade_record FROM_RELEASE "$target_id")
+  fi
+  [ "$target_id" != "$current_id" ] || die "$target_id is already the current release"
+  target_dir="$DATA_ROOT/releases/$target_id"
+  [ -f "$target_dir/release.env" ] && [ -f "$target_dir/runtime/compose.yaml" ] \
+    || die "release directory $target_dir is incomplete (release.env or runtime/compose.yaml missing)"
+  if [ -n "$record" ]; then
+    [ -n "$db_backup" ] || db_backup=$(release_value "$record" DB_BACKUP)
+    [ -n "$env_backup_file" ] || env_backup_file=$(release_value "$record" ENV_BACKUP)
+    log "Upgrade record: $record (upgrade $(release_value "$record" FROM_RELEASE) -> $(release_value "$record" TO_RELEASE), started $(release_value "$record" STARTED_AT))"
+    record_to=$(release_value "$record" TO_RELEASE)
+    [ "$record_to" = "$current_id" ] \
+      || log "note: that upgrade went to $record_to, not to the current $current_id; everything written since then is lost"
+  fi
+  if [ -z "$db_backup" ] || [ -z "$env_backup_file" ]; then
+    print_rollback_candidates
+    die "no upgrade record from $target_id; pass --backup FILE and --env FILE (the database backup and .env.before-* taken when $target_id was left)"
+  fi
+  [ -f "$env_backup_file" ] || die "env backup not found: $env_backup_file"
+  for key in BACKEND_IMAGE FRONTEND_IMAGE; do
+    image=$(release_value "$env_backup_file" "$key")
+    [ -n "$image" ] || die "$env_backup_file has no $key"
+    docker image inspect "$image" >/dev/null 2>&1 || die "image $image of $target_id is not on this server any more; load it before rolling back"
+  done
+  run_db_restore --check "$db_backup"
+  log "Rollback plan: $current_id -> $target_id"
+  log "  database: replaced with $db_backup"
+  log "  .env:     replaced with $env_backup_file (the current one is saved first)"
+  log "  images:   backend $(release_value "$env_backup_file" BACKEND_IMAGE), frontend $(release_value "$env_backup_file" FRONTEND_IMAGE)"
+  confirm "Roll back from $current_id to $target_id? Everything written after $db_backup was taken is lost; backend and frontend stop during the rollback."
+  RETRY_COMMAND="sudo '$SELF_DIR/nusctl' rollback '$target_id' --backup '$db_backup' --env '$env_backup_file' --no-safety-backup --yes"
+  step 'stop backend and frontend' stop_writers
+  take_safety_backup
+  step "restore the database from $db_backup (drop, recreate, import)" run_db_restore "$db_backup"
+  step 'save the current .env' backup_env_file "rollback-from-$current_id"
+  step "restore .env from $env_backup_file" restore_env_file "$env_backup_file"
+  # Start the target with its own Compose file and the restored .env; current moves only once it is healthy,
+  # so repeating this command after a failure still finds the same releases.
+  COMPOSE_FILE="$target_dir/runtime/compose.yaml"
+  reload_env_for_compose
+  step 'clear the Redis caches of the restored database' clear_restored_db_caches
+  step "start backend $BACKEND_IMAGE and frontend $FRONTEND_IMAGE, health checks" start_apps
+  step "point $DATA_ROOT/current at releases/$target_id" set_current_release "releases/$target_id"
+  if [ -n "$record" ] && [ "$(release_value "$record" TO_RELEASE)" = "$current_id" ]; then
+    record_set "$record" STATUS rolled-back
+    record_set "$record" ROLLED_BACK_AT "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  fi
+  log "Rollback completed: $target_id is running, backend and frontend are healthy"
+  [ -z "${SAFETY_BACKUP_FILE:-}" ] || log "The database as it was on $current_id is saved in $SAFETY_BACKUP_FILE"
+  log "Release $current_id stays in $DATA_ROOT/releases; nusctl now runs the $target_id tools"
+}
+
+cmd=${1:-status}
+case "$cmd" in
+  start) compose up -d ;;
+  stop) compose stop ;;
+  restart) compose restart ;;
+  status) compose ps ;;
+  logs)
+    shift
+    case "${1:-}" in
+      backend|frontend|mysql|redis|elasticsearch|skywalking-oap|skywalking-ui) service=$1; shift ;;
+      *) service=backend ;;
+    esac
+    follow=false
+    since=
+    only_error=false
+    trace_id=
+    while [ "$#" -gt 0 ]; do
+      case "$1" in
+        --follow|-f) follow=true ;;
+        --since)
+          shift
+          [ "$#" -gt 0 ] || die '--since requires a value'
+          case "$1" in ''|*[!A-Za-z0-9._:+-]*) die 'invalid --since value' ;; esac
+          since=$1
+          ;;
+        --error) only_error=true ;;
+        --trace-id)
+          shift
+          [ "$#" -gt 0 ] || die '--trace-id requires a value'
+          case "$1" in ''|*[!A-Za-z0-9._:-]*) die 'invalid trace id' ;; esac
+          trace_id=$1
+          ;;
+        *) die "unsupported logs option: $1" ;;
+      esac
+      shift
+    done
+    set -- logs --no-color
+    [ -z "$since" ] || set -- "$@" --since "$since"
+    [ "$follow" = false ] || set -- "$@" --follow
+    if [ "$only_error" = false ] && [ -z "$trace_id" ]; then
+      compose "$@" "$service"
+    else
+      compose "$@" "$service" | awk -v only_error="$only_error" -v trace_id="$trace_id" '
+        (only_error != "true" || $0 ~ / ERROR /) &&
+        (trace_id == "" || index($0, "[traceId=" trace_id "]") > 0)
+      '
+    fi
+    ;;
+  doctor)
+    docker version --format 'Docker {{.Server.Version}}'
+    compose ps
+    df -h "$DATA_ROOT"
+    free -h
+    sysctl vm.max_map_count
+    printf '%s\n' 'SkyWalking storage:'
+    compose exec -T elasticsearch curl --fail --silent 'http://127.0.0.1:9200/_cluster/health?pretty' || printf '%s\n' 'unavailable'
+    printf '%s\n' 'Flyway schema version:'
+    MYSQL_PWD=$NUS_DB_PASSWORD compose exec -T -e MYSQL_PWD mysql mysql -u"$NUS_DB_USERNAME" -Nse \
+      "SELECT COALESCE(MAX(CAST(version AS UNSIGNED)), 0) FROM flyway_schema_history WHERE success = 1;" "$NUS_DB_NAME"
+    printf '%s\n' 'Recent monitoring/application errors:'
+    compose logs --no-color --tail=40 backend skywalking-oap elasticsearch 2>/dev/null | grep -E 'ERROR|Exception' | tail -20 || true
+    ;;
+  monitor-status) compose ps elasticsearch skywalking-oap skywalking-ui backend; compose exec -T elasticsearch curl --fail --silent 'http://127.0.0.1:9200/_cluster/health?pretty' ;;
+  monitor-restart) compose restart elasticsearch; wait_healthy elasticsearch 90; compose restart skywalking-oap; wait_healthy skywalking-oap 90; compose restart skywalking-ui; wait_healthy skywalking-ui 60 ;;
+  monitor-credentials) printf 'username=%s\npassword=%s\n' "$NUS_MONITOR_USERNAME" "$NUS_MONITOR_PASSWORD" ;;
+  backup) shift; cmd_backup "$@" ;;
+  restore) shift; cmd_restore "$@" ;;
+  rollback) shift; cmd_rollback "$@" ;;
+  *) usage ;;
+esac

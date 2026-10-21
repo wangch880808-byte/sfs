@@ -1,0 +1,12 @@
+{
+  "auth": {
+    "login": "登录"
+  },
+  "dashboard": {
+    "title": "概览",
+    "workspace": "工作台"
+  },
+  "action": {
+    "more": "更多"
+  }
+}

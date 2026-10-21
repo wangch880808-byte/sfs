@@ -1,0 +1,80 @@
+<style data-app-loading="inject-css">
+  @keyframes loader-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .loader {
+      animation-duration: 2.4s;
+    }
+  }
+
+  /*
+   * 启动加载页（V1.0.1.6 界面规范）：画布色底、细线转圈、应用名 15/600 次要文字；
+   * 颜色与 apps/web-antd/src/styles/theme/palette.ts 的画布、文字、主色一致（此时主题样式还没写进页面，只能直接写值）。
+   */
+  html {
+    /* same as ant-design-vue/dist/reset.css setting, avoid the title line-height changed */
+    line-height: 1.15;
+  }
+
+  .loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family:
+      -apple-system, blinkmacsystemfont, 'Segoe UI', 'PingFang SC',
+      'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', arial, sans-serif;
+    background-color: #f7f7f8;
+  }
+
+  .loading.hidden {
+    visibility: hidden;
+    pointer-events: none;
+    opacity: 0;
+    transition: all 0.18s ease-out;
+  }
+
+  .dark .loading {
+    background-color: #0f1011;
+  }
+
+  .loader {
+    width: 24px;
+    height: 24px;
+    border: 2px solid #dcdce1;
+    border-top-color: #0064d6;
+    border-radius: 50%;
+    animation: loader-spin 0.8s linear infinite;
+  }
+
+  .dark .loader {
+    border-color: #2e2f34;
+    border-top-color: #3392ff;
+  }
+
+  .title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #5c5f66;
+  }
+
+  .dark .title {
+    color: #9a9ca3;
+  }
+</style>
+<div class="loading" id="__app-loading__">
+  <div class="loader"></div>
+  <div class="title"><%= VITE_APP_TITLE %></div>
+</div>

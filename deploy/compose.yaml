@@ -1,0 +1,292 @@
+name: nus
+
+services:
+  mysql:
+    image: ${MYSQL_IMAGE:-mysql:8.4.6@sha256:869218921e61d6c3c89820955d63cca42971f0e3e6c1e2792247bbd944ebc6e9}
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${NUS_DB_NAME:-nus}
+      MYSQL_USER: ${NUS_DB_USERNAME:-nus}
+      MYSQL_PASSWORD: ${NUS_DB_PASSWORD:?NUS_DB_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${NUS_DB_ROOT_PASSWORD:?NUS_DB_ROOT_PASSWORD is required}
+      TZ: ${TZ:-Asia/Shanghai}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --max-connections=200
+    volumes:
+      - ${DATA_ROOT:-/srv/nus}/data/mysql:/var/lib/mysql
+    networks:
+      - nus-internal
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_ROOT_PASSWORD}\" mysqladmin ping -h 127.0.0.1 -u root --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 2560M
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: "5"
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7.4.6-alpine@sha256:3b73847e72874be07e6657b129a94761662b79bc0f679273757d4218573b2a98}
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${NUS_REDIS_PASSWORD:?NUS_REDIS_PASSWORD is required}"]
+    volumes:
+      - ${DATA_ROOT:-/srv/nus}/data/redis:/data
+    networks:
+      - nus-internal
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${NUS_REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    environment:
+      NUS_REDIS_PASSWORD: ${NUS_REDIS_PASSWORD:?NUS_REDIS_PASSWORD is required}
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"
+
+  elasticsearch:
+    image: ${ELASTICSEARCH_IMAGE:-docker.elastic.co/elasticsearch/elasticsearch:8.17.3@sha256:224c75e346bd745ce908f06a1cbad7bf10988961dcdcdfccb22556b3f856b3f0}
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.ml.enabled: "false"
+      ingest.geoip.downloader.enabled: "false"
+      ES_JAVA_OPTS: -Xms2g -Xmx2g
+    volumes:
+      - ${DATA_ROOT:-/srv/nus}/data/elasticsearch:/usr/share/elasticsearch/data
+    networks:
+      - nus-observability
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow >/dev/null"]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 60s
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 3072M
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: "5"
+
+  skywalking-oap:
+    image: ${SKYWALKING_OAP_IMAGE:-apache/skywalking-oap-server:11.0.0@sha256:835a0d8de39af9dda760a5df9a992d982376cf6e8934eb8dd69baf72a1612091}
+    restart: unless-stopped
+    environment:
+      SW_STORAGE: elasticsearch
+      SW_STORAGE_ES_CLUSTER_NODES: elasticsearch:9200
+      SW_HEALTH_CHECKER: default
+      SW_TELEMETRY: prometheus
+      SW_CORE_RECORD_DATA_TTL: ${NUS_SKYWALKING_RECORD_TTL_DAYS:-7}
+      SW_CORE_METRICS_DATA_TTL: ${NUS_SKYWALKING_METRICS_TTL_DAYS:-15}
+      JAVA_OPTS: -Xms512m -Xmx1024m
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - nus-observability
+      - nus-internal
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/127.0.0.1/12800'"]
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 1536M
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: "5"
+
+  skywalking-ui:
+    image: ${SKYWALKING_UI_IMAGE:-ghcr.io/apache/skywalking-horizon-ui:1.0.0@sha256:eb08dcf2fe28fc805aaaeb48f25e0b67d141672a0b9a3a174bbfc4135dd6127d}
+    restart: unless-stopped
+    environment:
+      HORIZON_OAP_QUERY_URL: http://skywalking-oap:12800
+      HORIZON_OAP_ADMIN_URL: http://skywalking-oap:17128
+      HORIZON_OAP_ZIPKIN_URL: http://skywalking-oap:12800/zipkin
+      HORIZON_TEMPLATES_MODE: live
+      HORIZON_AUTH_BACKEND: local
+      HORIZON_AUTH_LOCAL_USERS: ${NUS_HORIZON_AUTH_LOCAL_USERS:?NUS_HORIZON_AUTH_LOCAL_USERS is required}
+      HORIZON_PUBLIC_URL: ${NUS_SKYWALKING_URL:?NUS_SKYWALKING_URL is required}
+      HORIZON_SESSION_COOKIE_SECURE: ${NUS_MONITOR_COOKIE_SECURE:-false}
+      HORIZON_AI_ENABLED: "false"
+      LOG_LEVEL: warn
+      NODE_OPTIONS: --max-old-space-size=768
+    depends_on:
+      skywalking-oap:
+        condition: service_healthy
+    expose:
+      - "8081"
+    volumes:
+      - ${DATA_ROOT:-/srv/nus}/data/horizon:/data
+    networks:
+      - nus-observability
+      - nus-edge
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --quiet http://127.0.0.1:8081/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 1024M
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"
+
+  backend:
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE must be set from release.env}
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      NUS_DB_HOST: mysql
+      NUS_DB_PORT: "3306"
+      NUS_DB_NAME: ${NUS_DB_NAME:-nus}
+      NUS_DB_USERNAME: ${NUS_DB_USERNAME:-nus}
+      NUS_DB_PASSWORD: ${NUS_DB_PASSWORD:?NUS_DB_PASSWORD is required}
+      NUS_REDIS_HOST: redis
+      NUS_REDIS_PORT: "6379"
+      NUS_REDIS_PASSWORD: ${NUS_REDIS_PASSWORD:?NUS_REDIS_PASSWORD is required}
+      NUS_DRUID_ENABLED: ${NUS_DRUID_ENABLED:-true}
+      NUS_DRUID_ALLOW: ${NUS_DRUID_ALLOW:-127.0.0.1,172.16.0.0/12}
+      NUS_SPRING_BOOT_ADMIN_ENABLED: ${NUS_SPRING_BOOT_ADMIN_ENABLED:-true}
+      NUS_MONITOR_USERNAME: ${NUS_MONITOR_USERNAME:?NUS_MONITOR_USERNAME is required}
+      NUS_MONITOR_PASSWORD: ${NUS_MONITOR_PASSWORD:?NUS_MONITOR_PASSWORD is required}
+      NUS_MONITOR_COOKIE_SECURE: ${NUS_MONITOR_COOKIE_SECURE:-false}
+      NUS_MONITOR_TICKET_TTL: ${NUS_MONITOR_TICKET_TTL:-45s}
+      NUS_MONITOR_SESSION_TTL: ${NUS_MONITOR_SESSION_TTL:-20m}
+      NUS_HORIZON_INTERNAL_URL: http://skywalking-ui:8081
+      NUS_SKYWALKING_URL: ${NUS_SKYWALKING_URL:?NUS_SKYWALKING_URL is required}
+      NUS_SKYWALKING_ENABLED: ${NUS_SKYWALKING_ENABLED:-true}
+      SW_AGENT_NAME: ${NUS_SKYWALKING_SERVICE_NAME:-nus-server}
+      SW_AGENT_COLLECTOR_BACKEND_SERVICES: skywalking-oap:11800
+      SW_AGENT_SAMPLE_N_PER_3_SECS: ${NUS_SKYWALKING_SAMPLE_N_PER_3_SECS:-100}
+      SW_AGENT_TRACE_IGNORE_PATH: /actuator/**,/admin/**,/druid/**
+      SW_LOGGING_LEVEL: WARN
+      NUS_API_ENCRYPT_REQUEST_KEY: ${NUS_API_ENCRYPT_REQUEST_KEY:?NUS_API_ENCRYPT_REQUEST_KEY is required}
+      NUS_API_ENCRYPT_RESPONSE_KEY: ${NUS_API_ENCRYPT_RESPONSE_KEY:?NUS_API_ENCRYPT_RESPONSE_KEY is required}
+      NUS_MYBATIS_ENCRYPTOR_PASSWORD: ${NUS_MYBATIS_ENCRYPTOR_PASSWORD:?NUS_MYBATIS_ENCRYPTOR_PASSWORD is required}
+      NUS_AI_EXTERNAL_STUDENT_DATA_ENABLED: ${NUS_AI_EXTERNAL_STUDENT_DATA_ENABLED:-true}
+      NUS_AI_REVIEW_ENABLED: ${NUS_AI_REVIEW_ENABLED:-true}
+      NUS_AI_MAX_CONCURRENT: ${NUS_AI_MAX_CONCURRENT:-4}
+      NUS_AI_CALL_TIMEOUT: ${NUS_AI_CALL_TIMEOUT:-120s}
+      NUS_AI_CONNECT_TIMEOUT: ${NUS_AI_CONNECT_TIMEOUT:-10s}
+      NUS_AI_REVIEW_TASK_POOL_SIZE: ${NUS_AI_REVIEW_TASK_POOL_SIZE:-2}
+      NUS_AI_REVIEW_TASK_QUEUE_CAPACITY: ${NUS_AI_REVIEW_TASK_QUEUE_CAPACITY:-100}
+      NUS_LOG_FILE: /app/logs/nus-server.log
+      NUS_AI_REVIEW_WORK_DIR: /app/tmp/nus-ai-review
+      NUS_ADMIN_BOOTSTRAP_ENABLED: ${NUS_ADMIN_BOOTSTRAP_ENABLED:-false}
+      NUS_ADMIN_BOOTSTRAP_USERNAME: ${NUS_ADMIN_BOOTSTRAP_USERNAME:-admin}
+      NUS_ADMIN_BOOTSTRAP_PASSWORD_FILE: ${NUS_ADMIN_BOOTSTRAP_PASSWORD_FILE:-/run/nus/config/admin-password}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ${CONFIG_ROOT:-/srv/nus/config}:/run/nus/config:ro
+      - ${DATA_ROOT:-/srv/nus}/data/uploads:/app/uploads
+      - ${DATA_ROOT:-/srv/nus}/data/tmp:/app/tmp
+      - ${DATA_ROOT:-/srv/nus}/logs/backend:/app/logs
+    expose:
+      - "48080"
+      - "48081"
+    networks:
+      - nus-internal
+      - nus-egress
+      - nus-observability
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent http://127.0.0.1:48081/actuator/health | grep -q 'UP'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 2560M
+    logging:
+      driver: json-file
+      options:
+        max-size: 50m
+        max-file: "5"
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?FRONTEND_IMAGE must be set from release.env}
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-80}:8080"
+      - "${NUS_SKYWALKING_UI_PORT:-8082}:8082"
+    networks:
+      - nus-edge
+      - nus-internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider --quiet http://127.0.0.1:8080/nginx-health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"
+
+networks:
+  nus-edge:
+    driver: bridge
+  nus-internal:
+    driver: bridge
+    internal: true
+  nus-egress:
+    driver: bridge
+  nus-observability:
+    driver: bridge
+    internal: true

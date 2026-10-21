@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.nus.zknu.module.edu.dal.mysql.classstudent.EduClassStudentBatchMapper">
+    <sql id="ids"><foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach></sql>
+    <update id="restoreRelations">
+        UPDATE edu_class_student SET deleted = 0, status = #{status}, join_time = #{joinTime},
+            remark = #{remark}, update_time = NOW()
+        WHERE deleted = 1 AND id IN <include refid="ids"/>
+    </update>
+    <insert id="insertRelations">
+        INSERT INTO edu_class_student (class_id, student_id, status, join_time, remark, creator, updater, create_time, update_time, deleted)
+        VALUES <foreach collection="rows" item="row" separator=",">
+            (#{row.classId}, #{row.studentId}, #{row.status}, #{row.joinTime}, #{row.remark},
+             COALESCE(#{operator,jdbcType=VARCHAR}, ''), COALESCE(#{operator,jdbcType=VARCHAR}, ''), NOW(), NOW(), 0)
+        </foreach>
+    </insert>
+    <!-- 恢复需要读取墓碑；其余查询和更新仍显式限定逻辑删除状态。 -->
+    <select id="selectAssigneesIncludingDeleted" resultType="cn.nus.zknu.module.edu.dal.dataobject.homework.EduHomeworkAssigneeDO">
+        SELECT id, homework_id, student_id, deleted FROM edu_homework_assignee
+        WHERE deleted IN (FALSE, TRUE) AND homework_id IN
+        <foreach collection="homeworkIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+        AND student_id IN <foreach collection="studentIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+    <update id="restoreAssignees">
+        UPDATE edu_homework_assignee SET deleted = 0, assigned_time = NOW(), update_time = NOW()
+        WHERE deleted = 1 AND id IN <include refid="ids"/>
+    </update>
+    <update id="removeAssignees">
+        UPDATE edu_homework_assignee SET deleted = 1, update_time = NOW()
+        WHERE deleted = 0 AND id IN <include refid="ids"/>
+    </update>
+    <insert id="insertAssignees">
+        INSERT INTO edu_homework_assignee (homework_id, student_id, class_id, assigned_time, creator, updater, create_time, update_time, deleted)
+        VALUES <foreach collection="rows" item="row" separator=",">
+            (#{row.homeworkId}, #{row.studentId}, #{row.classId}, #{row.assignedTime},
+             COALESCE(#{operator,jdbcType=VARCHAR}, ''), COALESCE(#{operator,jdbcType=VARCHAR}, ''), NOW(), NOW(), 0)
+        </foreach>
+    </insert>
+    <insert id="insertProfiles">
+        INSERT INTO system_user_profile (user_id, user_type, grade_year, class_ids, creator, updater, create_time, update_time, deleted)
+        VALUES <foreach collection="rows" item="row" separator=",">
+            (#{row.userId}, #{row.userType}, #{row.gradeYear},
+             #{row.classIds,typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler},
+             COALESCE(#{operator,jdbcType=VARCHAR}, ''), COALESCE(#{operator,jdbcType=VARCHAR}, ''), NOW(), NOW(), 0)
+        </foreach>
+    </insert>
+    <update id="updateProfiles">
+        UPDATE system_user_profile SET class_ids = CASE id
+        <foreach collection="rows" item="row">
+            WHEN #{row.id} THEN #{row.classIds,typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler}
+        </foreach> END, update_time = NOW(), updater = COALESCE(#{operator,jdbcType=VARCHAR}, '')
+        WHERE deleted = 0 AND id IN
+        <foreach collection="rows" item="row" open="(" separator="," close=")">#{row.id}</foreach>
+    </update>
+</mapper>

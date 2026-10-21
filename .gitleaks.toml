@@ -1,0 +1,13 @@
+# 敏感信息扫描配置：沿用 gitleaks 默认规则，只跳过本机构建产物和依赖目录（它们不进仓库）
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "本机构建产物与依赖"
+paths = [
+  '''(^|/)node_modules/''',
+  '''(^|/)dist/''',
+  '''(^|/)target/''',
+  '''(^|/)\.turbo/''',
+  '''(^|/)\.cache/''',
+]

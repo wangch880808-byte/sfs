@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.nus.zknu.module.edu.dal.mysql.student.StudentCapacityMapper">
+    <!--
+        能力分析按“历史可见”统计：已发布、已截止，或任务已归档但学生提交过；
+        不看班级、课程、班课是否归档，归档上学期的班级后能力画像不变。
+        需要 h（任务）、hr（本人提交记录）两个别名，并已 JOIN edu_homework_assignee。
+    -->
+    <sql id="historyVisibleScope">
+        AND (h.status IN (1, 2) OR (h.status = 3 AND hr.id IS NOT NULL))
+    </sql>
+
+
+    <!-- 按一级指标聚合达标率 -->
+    <select id="selectFirstIndicatorRates" resultType="java.util.Map">
+        SELECT h.indicator_first_id AS indicatorFirstId, ci.indicator_name AS indicatorName, ci.weight AS indicatorWeight,
+               COUNT(*) AS totalTasks,
+               SUM(CASE WHEN hr.status IN (1, 2, 4) THEN 1 ELSE 0 END) AS submittedTasks,
+               SUM(CASE WHEN hr.status IN (1, 4) THEN 1 ELSE 0 END) AS pendingReviewTasks,
+               SUM(CASE WHEN hr.status = 2 AND hr.score IS NOT NULL THEN 1 ELSE 0 END) AS evaluatedTasks,
+               SUM(CASE WHEN hr.status = 2 AND hr.score >= h.pass_score THEN 1 ELSE 0 END) AS qualifiedTasks
+        FROM edu_homework h
+        JOIN edu_homework_assignee ha ON ha.homework_id = h.id AND ha.student_id = #{studentId} AND ha.deleted = 0
+        LEFT JOIN edu_homework_record hr ON h.id = hr.homework_id AND hr.student_id = #{studentId} AND hr.deleted = 0
+        JOIN capacity_indicator ci ON h.indicator_first_id = ci.id AND ci.deleted = 0
+        WHERE h.class_id IN
+        <foreach collection="classIds" item="classId" open="(" separator="," close=")">
+            #{classId}
+        </foreach>
+        AND h.deleted = 0 <include refid="historyVisibleScope"/> AND h.indicator_first_id IS NOT NULL
+        GROUP BY h.indicator_first_id, ci.indicator_name, ci.weight
+    </select>
+
+    <!-- 按二级指标聚合达标率（指定一级指标下） -->
+    <select id="selectSecondIndicatorRates" resultType="java.util.Map">
+        SELECT h.indicator_second_id AS indicatorSecondId, ci.indicator_name AS indicatorName,
+               COUNT(*) AS totalTasks,
+               SUM(CASE WHEN hr.status IN (1, 2, 4) THEN 1 ELSE 0 END) AS submittedTasks,
+               SUM(CASE WHEN hr.status IN (1, 4) THEN 1 ELSE 0 END) AS pendingReviewTasks,
+               SUM(CASE WHEN hr.status = 2 AND hr.score IS NOT NULL THEN 1 ELSE 0 END) AS evaluatedTasks,
+               SUM(CASE WHEN hr.status = 2 AND hr.score >= h.pass_score THEN 1 ELSE 0 END) AS qualifiedTasks
+        FROM edu_homework h
+        JOIN edu_homework_assignee ha ON ha.homework_id = h.id AND ha.student_id = #{studentId} AND ha.deleted = 0
+        LEFT JOIN edu_homework_record hr ON h.id = hr.homework_id AND hr.student_id = #{studentId} AND hr.deleted = 0
+        JOIN capacity_indicator ci ON h.indicator_second_id = ci.id AND ci.deleted = 0
+        WHERE h.class_id IN
+        <foreach collection="classIds" item="classId" open="(" separator="," close=")">
+            #{classId}
+        </foreach>
+        AND h.indicator_first_id = #{indicatorFirstId}
+        AND h.deleted = 0 <include refid="historyVisibleScope"/> AND h.indicator_second_id IS NOT NULL
+        GROUP BY h.indicator_second_id, ci.indicator_name
+    </select>
+
+    <!-- 查询指定一级指标下的任务及学生成绩 -->
+    <select id="selectHomeworksByIndicatorFirst" resultType="java.util.Map">
+        SELECT h.id AS homeworkId, h.homework_name AS homeworkName,
+               h.indicator_second_id AS indicatorSecondId, h.pass_score AS passScore,
+               CASE WHEN hr.status = 2 THEN hr.score ELSE NULL END AS score, hr.status AS recordStatus
+        FROM edu_homework h
+        JOIN edu_homework_assignee ha ON ha.homework_id = h.id AND ha.student_id = #{studentId} AND ha.deleted = 0
+        LEFT JOIN edu_homework_record hr ON h.id = hr.homework_id AND hr.student_id = #{studentId} AND hr.deleted = 0
+        WHERE h.class_id IN
+        <foreach collection="classIds" item="classId" open="(" separator="," close=")">
+            #{classId}
+        </foreach>
+        AND h.indicator_first_id = #{indicatorFirstId}
+        AND h.deleted = 0 <include refid="historyVisibleScope"/>
+        ORDER BY h.id
+    </select>
+
+    <!-- 查询一级指标名称 -->
+    <select id="selectIndicatorName" resultType="java.lang.String">
+        SELECT indicator_name FROM capacity_indicator WHERE id = #{indicatorId} AND deleted = 0
+    </select>
+
+    <!-- 统计学生所有任务的完成情况 -->
+    <select id="selectOverallStats" resultType="java.util.Map">
+        SELECT COUNT(*) AS totalTasks,
+               SUM(CASE WHEN hr.status IN (1,2,4) THEN 1 ELSE 0 END) AS submittedTasks,
+               SUM(CASE WHEN hr.status IN (1,4) THEN 1 ELSE 0 END) AS pendingReviewTasks,
+               SUM(CASE WHEN hr.status = 2 AND hr.score IS NOT NULL THEN 1 ELSE 0 END) AS evaluatedTasks,
+               SUM(CASE WHEN hr.status = 2 AND hr.score >= h.pass_score THEN 1 ELSE 0 END) AS qualifiedTasks,
+               SUM(CASE WHEN hr.status = 2 AND hr.score IS NOT NULL AND h.indicator_first_id IS NULL THEN 1 ELSE 0 END) AS unindicatedEvaluatedCount
+        FROM edu_homework h
+        JOIN edu_homework_assignee ha ON ha.homework_id = h.id AND ha.student_id = #{studentId} AND ha.deleted = 0
+        LEFT JOIN edu_homework_record hr ON h.id = hr.homework_id AND hr.student_id = #{studentId} AND hr.deleted = 0
+        WHERE h.class_id IN
+        <foreach collection="classIds" item="classId" open="(" separator="," close=")">
+            #{classId}
+        </foreach>
+        AND h.deleted = 0 <include refid="historyVisibleScope"/>
+    </select>
+
+    <!-- 直接汇总已批改成绩，按批改日期展示累计总分。 -->
+    <select id="selectScoreTrend" resultType="java.util.Map">
+        SELECT DATE(hr.correct_time) AS recordDate,
+               SUM(SUM(hr.score)) OVER (ORDER BY DATE(hr.correct_time)) AS totalScore
+        FROM edu_homework_record hr
+        JOIN edu_homework h ON h.id = hr.homework_id AND h.deleted = 0
+        WHERE hr.student_id = #{studentId} AND hr.deleted = 0
+          AND hr.status = 2 AND hr.score IS NOT NULL AND hr.correct_time IS NOT NULL
+          AND h.class_id IN
+        <foreach collection="classIds" item="classId" open="(" separator="," close=")">
+            #{classId}
+        </foreach>
+          <include refid="historyVisibleScope"/>
+          AND EXISTS (SELECT 1 FROM edu_homework_assignee ha WHERE ha.homework_id = h.id
+              AND ha.student_id = #{studentId} AND ha.deleted = 0)
+        GROUP BY DATE(hr.correct_time)
+        ORDER BY recordDate
+    </select>
+</mapper>

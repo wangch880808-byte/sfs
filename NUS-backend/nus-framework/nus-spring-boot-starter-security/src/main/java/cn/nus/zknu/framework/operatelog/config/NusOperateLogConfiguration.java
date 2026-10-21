@@ -1,0 +1,27 @@
+package cn.nus.zknu.framework.operatelog.config;
+
+import cn.nus.zknu.framework.operatelog.core.service.LogRecordServiceImpl;
+import com.mzt.logapi.service.ILogRecordService;
+import com.mzt.logapi.starter.annotation.EnableLogRecord;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
+
+/**
+ * 操作日志配置类
+ *
+ * @author hyh
+ */
+@EnableLogRecord(tenant = "")
+@AutoConfiguration
+@Slf4j
+public class NusOperateLogConfiguration {
+
+    @Bean
+    @Primary
+    public ILogRecordService iLogRecordServiceImpl() {
+        return new LogRecordServiceImpl();
+    }
+
+}

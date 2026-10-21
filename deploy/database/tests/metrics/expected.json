@@ -1,0 +1,33 @@
+{
+  "fixture": {
+    "validClassId": 910001,
+    "validCourseId": 910001,
+    "boundaryHomeworkId": 910001,
+    "studentTwoId": 910002,
+    "note": "有效班 2 个已截止任务有 9 份已批改成绩；打回记录、未截止空任务和归档班任务均不进入分档分母。910004 的学生六指派时间晚于原指派，模拟入班补发；已截止任务的指派名单保持原快照。"
+  },
+  "totalPassRate": {
+    "totalCount": 9,
+    "unqualifiedRate": 22.22,
+    "qualifiedRate": 11.11,
+    "goodRate": 22.22,
+    "excellentRate": 44.44,
+    "calculation": "任务910001: 59不合格、60合格、75良好、85与85优秀；任务910002的及格线80: 79不合格、80良好、85与90优秀。计数2/1/2/4。"
+  },
+  "boundaryRanks": {
+    "910004": 1,
+    "910005": 1,
+    "910003": 3,
+    "calculation": "同一任务的85、85、75分对应竞赛名次1、1、3。"
+  },
+  "studentTwoReport": {
+    "totalTasks": 2,
+    "evaluatedTasks": 2,
+    "qualifiedTasks": 2,
+    "qualifiedRate": 100.0,
+    "certificateEligible": true,
+    "calculation": "学生二被指派任务910001、910002，分别得60和80，均达到任务自身及格线；未指派任务910004不计入。"
+  },
+  "aiCorrectionsFixtureContribution": 1,
+  "aiCalculation": "910004已批改且有成功AI草案；910005只有失败草案，910011的任务已归档。全局看板可能包含基线数据，脚本仅核验不少于1。"
+}

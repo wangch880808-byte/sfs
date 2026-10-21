@@ -1,0 +1,5 @@
+ARG BASE_IMAGE=nus-front:current
+FROM ${BASE_IMAGE}
+
+RUN find /usr/share/nginx/html -mindepth 1 -delete
+COPY dist/ /usr/share/nginx/html/

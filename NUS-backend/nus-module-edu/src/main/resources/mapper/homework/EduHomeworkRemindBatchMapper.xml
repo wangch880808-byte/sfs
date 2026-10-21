@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="cn.nus.zknu.module.edu.dal.mysql.homework.EduHomeworkRemindBatchMapper">
+    <insert id="insertLogs" useGeneratedKeys="true" keyProperty="rows.id">
+        INSERT INTO edu_homework_remind_log (homework_id, student_id, remind_type, deadline,
+            creator, updater, create_time, update_time, deleted)
+        VALUES <foreach collection="rows" item="row" separator=",">
+            (#{row.homeworkId}, #{row.studentId}, #{row.remindType}, #{row.deadline},
+             COALESCE(#{operator,jdbcType=VARCHAR}, ''), COALESCE(#{operator,jdbcType=VARCHAR}, ''), NOW(), NOW(), 0)
+        </foreach>
+    </insert>
+    <!-- 占位只有发送失败才能物理撤销，不能按任务范围删除其他运行的占位。 -->
+    <delete id="deleteFailedLogs">
+        DELETE FROM edu_homework_remind_log WHERE deleted = 0 AND id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </delete>
+</mapper>

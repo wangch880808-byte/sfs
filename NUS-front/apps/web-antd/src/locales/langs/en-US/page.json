@@ -1,0 +1,12 @@
+{
+  "auth": {
+    "login": "Login"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "workspace": "Workspace"
+  },
+  "action": {
+    "more": "More"
+  }
+}
