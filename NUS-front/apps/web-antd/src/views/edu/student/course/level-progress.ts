@@ -1,7 +1,7 @@
 /**
- * 课程详情“等级闯关”一栏的显示文字：每个等级自己的达标进度，未解锁时说明还差什么。
+ * 课程详情“等级闯关”一栏的显示文字：每个等级自己的达标进度。
  *
- * 口径（与后端一致）：只计已截止或已提交的任务；上一等级的达标比例达到阈值后解锁下一等级，解锁后不再收回。
+ * 口径（与后端一致）：只计已截止或已提交的任务；初级、中级、高级始终开放，达标数据只用于展示进度。
  * 旧接口没有 passedCount、requiredCount 等字段时，退回旧的 qualifiedTasks、totalTasks。
  */
 import type { StudentCourseApi } from '#/api/edu/student/course';
@@ -38,9 +38,8 @@ export function getThresholdPercent(
 
 /** 等级闯关一栏顶部的规则说明（不超过 60 字） */
 export function buildLevelRuleHint(levels: StudentCourseApi.UnlockLevel[]) {
-  const threshold = getThresholdPercent(levels);
-  const target = threshold === undefined ? '达到要求' : `达到 ${threshold}%`;
-  return `只计已截止或已提交的任务；上一等级的达标比例${target}后解锁下一等级，解锁后不再收回。`;
+  void levels; // 等级始终开放，规则说明不再依赖阈值；保留入参兼容现有调用
+  return '只计已截止或已提交的任务；初级、中级、高级均可直接开始，达标数据只作进度参考。';
 }
 
 export function describeLevel(

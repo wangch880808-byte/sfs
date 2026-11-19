@@ -83,12 +83,11 @@ describe('等级闯关显示', () => {
     expect(view.countText).toBe('4/5 个达标 · 80%');
   });
 
-  it('规则说明带上阈值且不超过 60 字', () => {
+  it('规则说明写清各等级可直接开始且不超过 60 字', () => {
     const levels = [level({ threshold: 0.8 })];
     expect(getThresholdPercent(levels)).toBe(80);
     const hint = buildLevelRuleHint(levels);
-    expect(hint).toContain('达到 80%');
+    expect(hint).toContain('均可直接开始');
     expect(hint.length).toBeLessThanOrEqual(60);
-    expect(buildLevelRuleHint([level({})])).toContain('达到要求');
   });
 });

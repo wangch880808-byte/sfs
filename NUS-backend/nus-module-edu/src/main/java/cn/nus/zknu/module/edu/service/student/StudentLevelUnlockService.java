@@ -2,9 +2,7 @@ package cn.nus.zknu.module.edu.service.student;
 
 import cn.hutool.core.util.StrUtil;
 import cn.nus.zknu.module.edu.controller.admin.student.vo.AppStudentUnlockStatusRespVO;
-import cn.nus.zknu.module.edu.dal.dataobject.student.EduStudentLevelUnlockDO;
 import cn.nus.zknu.module.edu.dal.dataobject.student.StudentLevelTaskRow;
-import cn.nus.zknu.module.edu.dal.mysql.student.EduStudentLevelUnlockMapper;
 import cn.nus.zknu.module.edu.dal.mysql.student.StudentCourseMapper;
 import cn.nus.zknu.module.edu.service.statistics.EduMetricPolicy;
 import cn.nus.zknu.module.edu.service.student.StudentLevelUnlockCalculator.LevelOutcome;
@@ -17,17 +15,11 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static cn.nus.zknu.framework.common.exception.util.ServiceExceptionUtil.exception0;
-import static cn.nus.zknu.module.edu.enums.ErrorCodeConstants.STUDENT_COURSE_LEVEL_LOCKED;
 
 /**
- * 等级闯关：按 {@link StudentLevelUnlockCalculator} 的规则计算，并把第一次达标解锁写成快照（之后不再收回）。
+ * 等级闯关：按 {@link StudentLevelUnlockCalculator} 的规则统计各等级进度。
+ * 等级门槛已取消，初级、中级、高级始终开放；本服务不再写解锁快照，也不再拦截任务开始。
  */
 @Service
 @Slf4j
@@ -40,8 +32,6 @@ public class StudentLevelUnlockService {
 
     @Resource
     private StudentCourseMapper studentCourseMapper;
-    @Resource
-    private EduStudentLevelUnlockMapper unlockMapper;
     @Resource
     private EduMetricPolicy metricPolicy;
     @Resource
@@ -63,18 +53,10 @@ public class StudentLevelUnlockService {
     }
 
     /**
-     * 学生开始一个新任务前校验等级已解锁；没有解锁时提示原因。
+     * 学生开始新任务前的等级校验。等级门槛已取消，各等级始终开放，这里只保留入口以兼容现有调用链。
      */
     public void validateLevelUnlocked(Long studentId, Long courseId, Integer level) {
-        if (level == null || level <= 1 || level > StudentLevelUnlockCalculator.MAX_LEVEL) {
-            return;
-        }
-        LevelOutcome outcome = evaluate(studentId, courseId, false, LocalDateTime.now()).get(level - 1);
-        if (!outcome.isUnlocked()) {
-            String reason = StrUtil.blankToDefault(outcome.getReasonText(), "请先完成上一等级任务");
-            throw exception0(STUDENT_COURSE_LEVEL_LOCKED.getCode(), "{}还没有解锁：{}",
-                    StudentLevelUnlockCalculator.levelName(level), reason);
-        }
+        // 等级不再作为任务开始的门槛
     }
 
     public boolean keepScoreDuringRedo() {
@@ -114,44 +96,9 @@ public class StudentLevelUnlockService {
                 row.setPassScore(metricPolicy.defaultPassScore(row.getFullScore()));
             }
         }
-        Map<Integer, Integer> classLevelCounts = new HashMap<>();
-        if (!history) {
-            for (Map<String, Object> item : studentCourseMapper.selectClassLevelTaskCounts(studentId, courseId)) {
-                classLevelCounts.put(((Number) item.get("homeworkLevel")).intValue(),
-                        ((Number) item.get("taskCount")).intValue());
-            }
-        }
-        Map<Integer, EduStudentLevelUnlockDO> snapshots = unlockMapper.selectListByStudentAndCourse(studentId, courseId)
-                .stream().collect(Collectors.toMap(EduStudentLevelUnlockDO::getLevel, Function.identity(),
-                        (left, right) -> left));
-        // 往期课程只读查看时没有班级任务数，插班生规则不会触发
-        List<LevelOutcome> outcomes = StudentLevelUnlockCalculator.calculate(rows, classLevelCounts, snapshots,
-                metricPolicy.unlockRatio(), keepScoreDuringRedo(), !history && lateJoinerPass(), now);
-        if (!history) {
-            for (LevelOutcome outcome : outcomes) {
-                if (outcome.isEarned()) {
-                    saveSnapshot(studentId, courseId, outcome, now);
-                }
-            }
-        }
-        return outcomes;
-    }
-
-    private void saveSnapshot(Long studentId, Long courseId, LevelOutcome outcome, LocalDateTime now) {
-        BigDecimal ratio = outcome.getRatioAtUnlock() == null ? null
-                : BigDecimal.valueOf(outcome.getRatioAtUnlock()).setScale(4, RoundingMode.HALF_UP);
-        try {
-            unlockMapper.insertIfAbsent(studentId, courseId, outcome.level, now, ratio, String.valueOf(studentId));
-            outcome.unlockedAt = now;
-            if (outcome.isLateJoinerPass()) {
-                log.info("[saveSnapshot][插班生没有分配到上一等级任务，按配置放行 studentId={}, courseId={}, level={}]",
-                        studentId, courseId, outcome.level);
-            }
-        } catch (Exception ex) {
-            // 快照只是“不再收回”的保障，写入失败不影响本次按规则得出的解锁结果
-            log.warn("[saveSnapshot][写入等级解锁快照失败 studentId={}, courseId={}, level={}]",
-                    studentId, courseId, outcome.level, ex);
-        }
+        // 等级门槛取消后，班级任务数与解锁快照都不再参与判定；保留 history 参数仅供只读口径查询任务行
+        return StudentLevelUnlockCalculator.calculate(rows, java.util.Map.of(), java.util.Map.of(),
+                metricPolicy.unlockRatio(), keepScoreDuringRedo(), false, now);
     }
 
     private AppStudentUnlockStatusRespVO.Level toLevel(LevelOutcome outcome) {
