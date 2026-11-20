@@ -82,7 +82,11 @@ describe('学生首页：待完成', () => {
   });
 
   it('未提交与已打回、还没过有效截止时间的才算；未解锁的排后面；过期的单独计数', () => {
-    const todo = pickTodoTasks(list, new Map([[1, new Set([2])]]), NOW);
+    // locked 直接用后端按“技能 + 等级”匹配好的字段，不再按课程+等级推断
+    const withLock = list.map((item) =>
+      item.homeworkId === 3 ? { ...item, locked: true } : item,
+    );
+    const todo = pickTodoTasks(withLock, NOW);
     expect(todo.items.map((item) => [item.homeworkId, item.locked])).toEqual([
       [5, false],
       [4, false],
@@ -98,11 +102,10 @@ describe('学生首页：待完成', () => {
   });
 
   it('3 天内截止的只算能做的', () => {
-    const todo = pickTodoTasks(list, new Map(), NOW);
+    const todo = pickTodoTasks(list, NOW);
     expect(countDueSoonTodos(todo, NOW)).toBe(2);
     const lockedTodo = pickTodoTasks(
-      [task(4, 0, '2026-10-08 10:00:00', { homeworkLevel: 2 })],
-      new Map([[1, new Set([2])]]),
+      [task(4, 0, '2026-10-08 10:00:00', { homeworkLevel: 2, locked: true })],
       NOW,
     );
     expect(countDueSoonTodos(lockedTodo, NOW)).toBe(0);
@@ -177,7 +180,10 @@ describe('学生首页：留言与课程进度', () => {
 
 describe('学生首页：页头说明', () => {
   it('能做的、即将截止、等待解锁与未读留言', () => {
-    const todo = pickTodoTasks(list, new Map([[1, new Set([2])]]), NOW);
+    const withLock = list.map((item) =>
+      item.homeworkId === 3 ? { ...item, locked: true } : item,
+    );
+    const todo = pickTodoTasks(withLock, NOW);
     expect(buildStudentSummary({ todo, unread: 1 }, NOW)).toBe(
       '3 项任务待完成，2 项 3 天内截止，另有 1 项等待解锁，1 条留言未读。',
     );
@@ -185,8 +191,7 @@ describe('学生首页：页头说明', () => {
 
   it('只剩未解锁的任务时说明怎么解锁；什么都没有时说没有', () => {
     const lockedOnly = pickTodoTasks(
-      [task(3, 0, '2026-10-20 19:46:04', { homeworkLevel: 2 })],
-      new Map([[1, new Set([2])]]),
+      [task(3, 0, '2026-10-20 19:46:04', { homeworkLevel: 2, locked: true })],
       NOW,
     );
     expect(buildStudentSummary({ todo: lockedOnly }, NOW)).toBe(

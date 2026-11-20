@@ -141,11 +141,8 @@ async function handleReadNotify(item: SystemNotifyMessageApi.NotifyMessage) {
 
 // ---- 整理 ----
 const todo = computed(() =>
-  pickTodoTasks(
-    homeworkList.data.value ?? [],
-    lockedLevels.data.value ?? new Map(),
-    now.value,
-  ),
+  // locked 由后端按“课程 + 技能 + 等级”匹配好，直接用任务自带的字段
+  pickTodoTasks(homeworkList.data.value ?? [], now.value),
 );
 const openTodos = computed(() =>
   todo.value.items.filter((item) => !item.locked),

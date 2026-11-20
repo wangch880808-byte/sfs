@@ -91,10 +91,13 @@ public class StudentHomeworkServiceImpl implements StudentHomeworkService {
                     || level > StudentLevelUnlockCalculator.MAX_LEVEL) {
                 continue;
             }
+            long indicatorId = homework.getIndicatorFirstId() == null ? 0L : homework.getIndicatorFirstId();
             AppStudentUnlockStatusRespVO status = courseStatuses.computeIfAbsent(homework.getCourseId(),
                     courseId -> studentCourseService.getUnlockStatus(studentId, courseId));
             for (AppStudentUnlockStatusRespVO.Level item : status.getLevels()) {
-                if (Objects.equals(item.getLevel(), level)) {
+                // 等级和一级指标（技能）都要对上：同一等级不同技能的锁状态互不影响
+                if (Objects.equals(item.getLevel(), level)
+                        && indicatorId == (item.getIndicatorFirstId() == null ? 0L : item.getIndicatorFirstId())) {
                     homework.setLocked(!Boolean.TRUE.equals(item.getUnlocked()));
                     homework.setLockReason(homework.getLocked() ? item.getReasonText() : null);
                     break;
@@ -273,8 +276,11 @@ public class StudentHomeworkServiceImpl implements StudentHomeworkService {
 
     private void validateUnlockForNewTask(Long studentId, EduHomeworkDO homework, EduHomeworkRecordDO record) {
         // 已经开始的任务（含打回重做）不受后来新增的前置任务影响。
+        // 闯关按“课程 + 一级指标（技能）”独立计算，只校验任务所属的那个技能组；没填指标按 0 组。
         if (record == null) {
-            studentCourseService.validateLevelUnlocked(studentId, homework.getCourseId(), homework.getHomeworkLevel());
+            Long indicatorFirstId = homework.getIndicatorFirstId() == null ? 0L : homework.getIndicatorFirstId();
+            studentCourseService.validateLevelUnlocked(studentId, homework.getCourseId(),
+                    homework.getHomeworkLevel(), indicatorFirstId);
         }
     }
 

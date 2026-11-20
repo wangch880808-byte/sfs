@@ -26,44 +26,10 @@ class StudentLevelUnlockCalculatorTest {
     private long nextId = 1;
 
     @Test
-    void allLevelsAreUnlockedWithoutAnyTasks() {
+    void firstLevelIsAlwaysUnlocked() {
         List<LevelOutcome> outcomes = calculate(true);
-
-        assertEquals(StudentLevelUnlockCalculator.MAX_LEVEL, outcomes.size());
-        for (LevelOutcome outcome : outcomes) {
-            assertTrue(outcome.isUnlocked(), "等级门槛已取消：" + outcome.level);
-            assertFalse(outcome.isEarned());
-            assertNull(outcome.getReasonText());
-            assertNull(outcome.getUnlockedAt());
-        }
-    }
-
-    @Test
-    void failedRatioDoesNotLockTheNextLevel() {
-        classCounts.put(1, 10);
-        task(1, PAST, 2, 30, null); // 未达标（30 < 60）
-        task(1, PAST, 2, 80, null); // 达标（80 >= 60），本等级达标比例 0.5
-        task(2, FUTURE, null, null, null);
-
-        List<LevelOutcome> outcomes = calculate(true);
-
-        assertEquals(0.5, outcomes.get(0).getRatio(), 1e-9);
-        assertTrue(outcomes.get(1).isUnlocked(), "初级没达标也不锁中级");
-        assertTrue(outcomes.get(2).isUnlocked(), "中级没达标也不锁高级");
-        assertNull(outcomes.get(1).getReasonText());
-        assertNull(outcomes.get(2).getReasonText());
-    }
-
-    @Test
-    void zeroDenominatorDoesNotLockTheNextLevel() {
-        task(1, FUTURE, null, null, null);
-        task(2, FUTURE, null, null, null);
-
-        List<LevelOutcome> outcomes = calculate(true);
-
-        assertEquals(0, outcomes.get(0).requiredCount);
-        assertTrue(outcomes.get(1).isUnlocked());
-        assertTrue(outcomes.get(2).isUnlocked());
+        assertTrue(outcomes.get(0).isUnlocked());
+        assertNull(outcomes.get(0).getReasonText());
     }
 
     @Test
@@ -80,6 +46,20 @@ class StudentLevelUnlockCalculatorTest {
         assertEquals(1, first.passedCount);
         assertEquals(1, first.pendingReviewCount);
         assertEquals(1D / 3, first.ratio, 1e-9);
+    }
+
+    @Test
+    void notYetDueTasksNoLongerDragTheRatioDown() {
+        // 旧规则：5 个分配任务、4 个达标 = 80%；再发 1 个没到截止的任务就变成 4/6 而重新上锁
+        for (int i = 0; i < 4; i++) task(1, PAST, 2, 80, null);
+        task(1, PAST, 2, 30, null);
+        task(1, FUTURE, null, null, null);
+
+        LevelOutcome second = calculate(true).get(1);
+
+        assertTrue(second.isUnlocked());
+        assertTrue(second.isEarned());
+        assertEquals(0.8, second.getRatioAtUnlock(), 1e-9);
     }
 
     @Test
@@ -110,7 +90,7 @@ class StudentLevelUnlockCalculatorTest {
 
     @Test
     void resubmittedWithoutPreviousScoreIsPendingNotPassed() {
-        task(1, PAST, 4, null, null);
+        task(1, PAST, 4, null, null);   // 批改前就打回过
         task(1, PAST, 1, null, null);
 
         LevelOutcome first = calculate(true).get(0);
@@ -119,11 +99,102 @@ class StudentLevelUnlockCalculatorTest {
     }
 
     @Test
+    void zeroDenominatorWithAssignedTasksKeepsTheNextLevelLocked() {
+        task(1, FUTURE, null, null, null);
+        task(2, FUTURE, null, null, null);
+
+        List<LevelOutcome> outcomes = calculate(true);
+
+        assertFalse(outcomes.get(1).isUnlocked(), "不能因为暂时没有到期的任务就跳过初级");
+        assertEquals("初级任务还没有截止或提交，提交并达标后即可解锁", outcomes.get(1).getReasonText());
+        assertFalse(outcomes.get(2).isUnlocked());
+        assertEquals("需要先解锁中级", outcomes.get(2).getReasonText());
+    }
+
+    @Test
+    void lateJoinerStaysLockedWhenThePassIsSwitchedOff() {
+        // 插班前初级任务已截止，没有分配给该学生；班级里有初级任务
+        classCounts.put(1, 3);
+        task(2, FUTURE, null, null, null);
+
+        LevelOutcome second = calculate(true, false).get(1);
+
+        assertFalse(second.isUnlocked());
+        assertFalse(second.isEarned());
+        assertEquals("你还没有初级任务（可能在加入班级前已截止），请联系教师补发", second.getReasonText());
+    }
+
+    @Test
+    void lateJoinerWithoutAnyFirstLevelTaskPassesAndGetsASnapshot() {
+        classCounts.put(1, 3);
+        task(2, FUTURE, null, null, null);
+
+        LevelOutcome second = calculate(true, true).get(1);
+
+        assertTrue(second.isUnlocked());
+        assertTrue(second.isEarned(), "插班生放行要写快照，之后教师补发初级任务也不再上锁");
+        assertTrue(second.isLateJoinerPass());
+        assertNull(second.getRatioAtUnlock(), "没有可计入的任务，快照不带达标比例");
+        assertNull(second.getReasonText());
+    }
+
+    @Test
+    void lateJoinerPassChainsThroughEveryLevelTheStudentMissed() {
+        classCounts.put(1, 2);
+        classCounts.put(2, 2);
+
+        List<LevelOutcome> outcomes = calculate(true, true);
+
+        assertTrue(outcomes.get(1).isLateJoinerPass());
+        assertTrue(outcomes.get(2).isUnlocked());
+        assertTrue(outcomes.get(2).isLateJoinerPass());
+    }
+
+    @Test
+    void lateJoinerWithAssignedFirstLevelTasksMustStillMeetTheRatio() {
+        classCounts.put(1, 5);
+        task(1, PAST, 2, 90, null);
+        task(1, PAST, null, null, null);   // 插班后分配到的初级任务没交
+
+        LevelOutcome second = calculate(true, true).get(1);
+
+        assertFalse(second.isUnlocked());
+        assertFalse(second.isLateJoinerPass());
+        assertEquals("初级还差 1 个任务达标（需达标 80%）", second.getReasonText());
+    }
+
+    @Test
+    void lateJoinerWithOnlyOpenFirstLevelTasksWaitsForThem() {
+        classCounts.put(1, 5);
+        task(1, FUTURE, null, null, null);   // 插班后补发、还没到截止
+
+        LevelOutcome second = calculate(true, true).get(1);
+
+        assertFalse(second.isUnlocked());
+        assertEquals("初级任务还没有截止或提交，提交并达标后即可解锁", second.getReasonText());
+    }
+
+    @Test
     void personalExtensionKeepsAnOverdueTaskOutOfTheDenominator() {
         for (int i = 0; i < 4; i++) task(1, PAST, 2, 90, null);
+        // 任务已过截止，但教师给该学生延期到明天：还不计入分母
         task(1, PAST, null, null, null).setPersonalDeadline(FUTURE);
 
-        assertEquals(4, calculate(true).get(0).requiredCount);
+        LevelOutcome first = calculate(true).get(0);
+        assertEquals(4, first.requiredCount);
+        assertTrue(calculate(true).get(1).isUnlocked());
+    }
+
+    @Test
+    void expiredPersonalExtensionCountsTheTask() {
+        for (int i = 0; i < 3; i++) task(1, PAST, 2, 90, null);
+        task(1, PAST.minusDays(2), null, null, null).setPersonalDeadline(PAST);
+        // 早于任务截止时间的延期不起作用
+        task(1, PAST, null, null, null).setPersonalDeadline(PAST.minusDays(3));
+
+        LevelOutcome first = calculate(true).get(0);
+        assertEquals(5, first.requiredCount);
+        assertEquals("初级还差 1 个任务达标（需达标 80%）", calculate(true).get(1).getReasonText());
     }
 
     @Test
@@ -144,8 +215,21 @@ class StudentLevelUnlockCalculatorTest {
     }
 
     @Test
-    void oldSnapshotsAreIgnoredBecauseNoLevelIsGated() {
-        task(1, PAST, 2, 30, null);
+    void levelThatDoesNotExistInTheCourseLetsTheNextLevelThroughWithoutSnapshot() {
+        task(2, FUTURE, null, null, null);
+
+        LevelOutcome second = calculate(true).get(1);
+
+        assertTrue(second.isUnlocked());
+        assertFalse(second.isEarned(), "没有初级任务时直接放行，但不写快照");
+        assertNull(second.getUnlockedAt());
+    }
+
+    @Test
+    void snapshotKeepsTheLevelUnlockedAfterTheRatioDrops() {
+        task(1, PAST, 2, 90, null);
+        task(1, PAST, 2, 10, null);
+        task(1, PAST, null, null, null);
         EduStudentLevelUnlockDO snapshot = new EduStudentLevelUnlockDO();
         snapshot.setLevel(2);
         snapshot.setUnlockedAt(PAST);
@@ -154,14 +238,81 @@ class StudentLevelUnlockCalculatorTest {
         LevelOutcome second = calculate(true).get(1);
 
         assertTrue(second.isUnlocked());
-        assertFalse(second.isEarned(), "不再写入新的解锁快照");
-        assertNull(second.getUnlockedAt());
+        assertFalse(second.isEarned());
+        assertEquals(PAST, second.getUnlockedAt());
         assertNull(second.getReasonText());
     }
 
+    @Test
+    void thresholdBoundaryAndMissingCountReason() {
+        for (int i = 0; i < 3; i++) task(1, PAST, 2, 60, null);
+        task(1, PAST, 2, 59, null);   // 60 分线，差 1 分
+
+        LevelOutcome second = calculate(true).get(1);
+
+        assertFalse(second.isUnlocked());
+        assertEquals("初级还差 1 个任务达标（需达标 80%）", second.getReasonText());
+    }
+
+    @Test
+    void pendingReviewReasonWhenWaitingForTheTeacherIsEnough() {
+        for (int i = 0; i < 3; i++) task(1, PAST, 2, 90, null);
+        task(1, PAST, 1, null, null);
+
+        assertEquals("有 1 个初级任务在等教师批改，达标后即可解锁", calculate(true).get(1).getReasonText());
+    }
+
+    @Test
+    void pendingReviewReasonWhenMoreTasksAreMissing() {
+        task(1, PAST, 2, 90, null);
+        task(1, PAST, 1, null, null);
+        task(1, PAST, null, null, null);
+        task(1, PAST, null, null, null);
+        task(1, PAST, null, null, null);
+
+        assertEquals("初级还差 3 个任务达标，其中 1 个在等教师批改", calculate(true).get(1).getReasonText());
+    }
+
+    @Test
+    void redoReasonPointsToTheResubmission() {
+        task(1, PAST, 2, 90, null);
+        task(1, PAST, 3, 20, 20);
+
+        assertEquals("初级还差 1 个任务达标，有 1 个已打回的任务可以重交", calculate(true).get(1).getReasonText());
+    }
+
+    @Test
+    void thirdLevelUsesTheSecondLevelGate() {
+        for (int i = 0; i < 5; i++) task(1, PAST, 2, 90, null);
+        task(2, PAST, 2, 90, null);
+        task(2, PAST, 2, 20, null);
+
+        List<LevelOutcome> outcomes = calculate(true);
+
+        assertTrue(outcomes.get(1).isUnlocked());
+        assertFalse(outcomes.get(2).isUnlocked());
+        assertEquals("中级还差 1 个任务达标（需达标 80%）", outcomes.get(2).getReasonText());
+    }
+
+    @Test
+    void allReasonTextsStayWithinSixtyCharacters() {
+        classCounts.put(1, 1);
+        for (int i = 0; i < 20; i++) task(1, PAST, null, null, null);
+        for (int i = 0; i < 20; i++) task(1, PAST, 1, null, null);
+        for (LevelOutcome outcome : calculate(true)) {
+            if (outcome.getReasonText() != null) {
+                assertTrue(outcome.getReasonText().length() <= 60, outcome.getReasonText());
+            }
+        }
+    }
+
     private List<LevelOutcome> calculate(boolean keepScoreDuringRedo) {
+        return calculate(keepScoreDuringRedo, true);
+    }
+
+    private List<LevelOutcome> calculate(boolean keepScoreDuringRedo, boolean lateJoinerPass) {
         return StudentLevelUnlockCalculator.calculate(rows, classCounts, snapshots, THRESHOLD,
-                keepScoreDuringRedo, true, NOW);
+                keepScoreDuringRedo, lateJoinerPass, NOW);
     }
 
     private StudentLevelTaskRow task(int level, LocalDateTime deadline, Integer status, Integer recordScore,

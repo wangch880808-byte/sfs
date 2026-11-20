@@ -1154,6 +1154,7 @@ CREATE TABLE `edu_student_level_unlock` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
   `student_id` bigint NOT NULL COMMENT '学生用户编号',
   `course_id` bigint NOT NULL COMMENT '课程编号',
+  `indicator_first_id` bigint NOT NULL DEFAULT 0 COMMENT '一级指标（技能）编号，0=未填指标',
   `level` tinyint NOT NULL COMMENT '解锁的等级：2=中级，3=高级',
   `unlocked_at` datetime NOT NULL COMMENT '解锁时间',
   `ratio_at_unlock` decimal(5,4) DEFAULT NULL COMMENT '解锁时上一等级的达标比例（0~1）',
@@ -1163,7 +1164,7 @@ CREATE TABLE `edu_student_level_unlock` (
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_student_course_level` (`student_id`,`course_id`,`level`),
+  UNIQUE KEY `uk_student_course_level` (`student_id`,`course_id`,`indicator_first_id`,`level`),
   KEY `idx_course_level` (`course_id`,`level`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学生等级解锁快照';
 

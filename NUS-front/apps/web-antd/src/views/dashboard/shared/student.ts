@@ -74,10 +74,11 @@ export function collectLockedLevels(
   return locked;
 }
 
-/** 待完成：未提交与已打回、还没过有效截止时间的任务；所在等级没解锁的标为未解锁、排在后面 */
+/** 待完成：未提交与已打回、还没过有效截止时间的任务；所在等级没解锁的标为未解锁、排在后面。
+ *  locked 直接用后端按“课程 + 一级指标（技能）+ 等级”匹配好的 item.locked，
+ *  不再按“课程 + 等级”推断，否则会把另一个技能的锁算到这条任务上。 */
 export function pickTodoTasks(
   list: StudentHomeworkApi.HomeworkItem[],
-  lockedLevels: Map<number, Set<number>>,
   now = Date.now(),
 ): TodoSummary {
   const items: TodoTask[] = [];
@@ -98,9 +99,7 @@ export function pickTodoTasks(
       homeworkId: item.homeworkId,
       homeworkLevel: Number(item.homeworkLevel),
       homeworkName: item.homeworkName,
-      locked:
-        lockedLevels.get(item.courseId)?.has(Number(item.homeworkLevel)) ??
-        false,
+      locked: item.locked === true,
       status,
     });
   }

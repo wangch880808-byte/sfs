@@ -21,16 +21,17 @@ public interface EduStudentLevelUnlockMapper extends BaseMapperX<EduStudentLevel
     }
 
     /**
-     * 只在第一次解锁时写入；并发重复写入由唯一键吸收，已有快照保持原样。
+     * 只在第一次解锁时写入；并发重复写入由唯一键（学生 + 课程 + 一级指标 + 等级）吸收，已有快照保持原样。
      *
      * @return 新写入的行数（0 表示已有快照）
      */
-    @Insert("INSERT INTO edu_student_level_unlock (student_id, course_id, level, unlocked_at, ratio_at_unlock, "
+    @Insert("INSERT INTO edu_student_level_unlock (student_id, course_id, indicator_first_id, level, unlocked_at, ratio_at_unlock, "
             + "creator, create_time, updater, update_time, deleted) "
-            + "VALUES (#{studentId}, #{courseId}, #{level}, #{unlockedAt}, #{ratioAtUnlock}, "
+            + "VALUES (#{studentId}, #{courseId}, #{indicatorFirstId}, #{level}, #{unlockedAt}, #{ratioAtUnlock}, "
             + "#{operator}, NOW(), #{operator}, NOW(), b'0') "
             + "ON DUPLICATE KEY UPDATE id = id")
     int insertIfAbsent(@Param("studentId") Long studentId, @Param("courseId") Long courseId,
+                       @Param("indicatorFirstId") Long indicatorFirstId,
                        @Param("level") Integer level, @Param("unlockedAt") LocalDateTime unlockedAt,
                        @Param("ratioAtUnlock") BigDecimal ratioAtUnlock, @Param("operator") String operator);
 

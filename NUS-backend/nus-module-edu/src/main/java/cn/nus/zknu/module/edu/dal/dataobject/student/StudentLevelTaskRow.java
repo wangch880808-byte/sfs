@@ -12,6 +12,10 @@ public class StudentLevelTaskRow {
 
     private Long homeworkId;
     private Integer homeworkLevel;
+    /** 一级指标（技能）编号，SQL 里 COALESCE 后为 0 表示未填 */
+    private Long indicatorFirstId;
+    /** 一级指标（技能）名称，用于解锁原因文案 */
+    private String indicatorName;
     private LocalDateTime deadline;
     /** 任务达标分数线；为空时按配置的默认比例换算 */
     private Integer passScore;

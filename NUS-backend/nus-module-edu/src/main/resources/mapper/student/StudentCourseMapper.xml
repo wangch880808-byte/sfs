@@ -157,6 +157,8 @@
     <select id="selectLevelTasks" resultType="cn.nus.zknu.module.edu.dal.dataobject.student.StudentLevelTaskRow">
         SELECT h.id AS homeworkId,
                h.homework_level AS homeworkLevel,
+               COALESCE(h.indicator_first_id, 0) AS indicatorFirstId,
+               ci.indicator_name AS indicatorName,
                h.deadline AS deadline,
                h.pass_score AS passScore,
                h.score AS fullScore,
@@ -177,6 +179,7 @@
         INNER JOIN edu_homework_assignee ha ON ha.homework_id = h.id
             AND ha.student_id = #{studentId} AND ha.deleted = 0
         LEFT JOIN edu_homework_record hr ON h.id = hr.homework_id AND hr.student_id = #{studentId} AND hr.deleted = 0
+        LEFT JOIN capacity_indicator ci ON ci.id = h.indicator_first_id AND ci.deleted = 0
         WHERE h.course_id = #{courseId}
           AND h.homework_level IN (1, 2, 3)
           AND h.deleted = 0
@@ -184,9 +187,10 @@
         ORDER BY h.homework_level, h.id
     </select>
 
-    <!-- 等级闯关：学生当前所在班级在这门课已发布的各等级任务数（判断某一等级在这门课里是否存在） -->
+    <!-- 等级闯关：学生当前所在班级在这门课、各一级指标下已发布的各等级任务数（判断某一等级在某技能里是否存在） -->
     <select id="selectClassLevelTaskCounts" resultType="java.util.Map">
-        SELECT h.homework_level AS homeworkLevel, COUNT(*) AS taskCount
+        SELECT COALESCE(h.indicator_first_id, 0) AS indicatorFirstId,
+               h.homework_level AS homeworkLevel, COUNT(*) AS taskCount
         FROM edu_homework h
         WHERE h.course_id = #{courseId}
           AND h.homework_level IN (1, 2, 3)
@@ -195,7 +199,7 @@
           AND h.class_id IN (SELECT cs.class_id FROM edu_class_student cs
                              WHERE cs.student_id = #{studentId} AND cs.deleted = 0)
           <include refid="visibleHomeworkScope"/>
-        GROUP BY h.homework_level
+        GROUP BY COALESCE(h.indicator_first_id, 0), h.homework_level
     </select>
 
     <!-- 按课程统计学生任务进度 -->

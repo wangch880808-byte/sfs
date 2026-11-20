@@ -21,6 +21,9 @@ public class AppStudentHomeworkRespVO {
     @Schema(description = "任务等级：0=专业, 1=初级, 2=中级, 3=高级", example = "1")
     private Integer homeworkLevel;
 
+    @Schema(description = "一级指标（技能）编号，0=未填指标；闯关按课程+指标分组", example = "6")
+    private Long indicatorFirstId;
+
     @Schema(description = "课程ID", example = "1")
     private Long courseId;
 

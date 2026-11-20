@@ -90,8 +90,8 @@ class StudentCourseAuthorizationTest extends BaseMockitoUnitTest {
     @Test
     void lockedLevelValidationIsDelegated() {
         doThrow(cn.nus.zknu.framework.common.exception.util.ServiceExceptionUtil.exception(STUDENT_COURSE_LEVEL_LOCKED))
-                .when(levelUnlockService).validateLevelUnlocked(10L, 20L, 2);
-        assertServiceException(() -> service.validateLevelUnlocked(10L, 20L, 2), STUDENT_COURSE_LEVEL_LOCKED);
+                .when(levelUnlockService).validateLevelUnlocked(10L, 20L, 2, 0L);
+        assertServiceException(() -> service.validateLevelUnlocked(10L, 20L, 2, 0L), STUDENT_COURSE_LEVEL_LOCKED);
     }
 
     @Test

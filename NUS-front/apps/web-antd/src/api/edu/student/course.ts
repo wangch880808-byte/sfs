@@ -58,6 +58,8 @@ export namespace StudentCourseApi {
    */
   export interface UnlockLevel {
     level: number;
+    /** 一级指标（技能）编号，0=未填指标；同一等级不同技能各自独立解锁 */
+    indicatorFirstId?: number;
     levelName: string;
     /** 分配给学生的该等级任务数 */
     totalTasks: number;

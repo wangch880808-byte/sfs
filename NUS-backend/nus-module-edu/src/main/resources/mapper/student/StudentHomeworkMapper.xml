@@ -30,6 +30,7 @@
                h.homework_name AS homeworkName,
                h.homework_type AS homeworkType,
                h.homework_level AS homeworkLevel,
+               COALESCE(h.indicator_first_id, 0) AS indicatorFirstId,
                h.course_id AS courseId,
                c.course_name AS courseName,
                h.deadline,

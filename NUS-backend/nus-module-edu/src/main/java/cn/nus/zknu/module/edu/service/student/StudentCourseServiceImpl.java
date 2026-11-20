@@ -131,8 +131,8 @@ public class StudentCourseServiceImpl implements StudentCourseService {
         return resp;
     }
 
-    public void validateLevelUnlocked(Long studentId, Long courseId, Integer level) {
-        levelUnlockService.validateLevelUnlocked(studentId, courseId, level);
+    public void validateLevelUnlocked(Long studentId, Long courseId, Integer level, Long indicatorFirstId) {
+        levelUnlockService.validateLevelUnlocked(studentId, courseId, level, indicatorFirstId);
     }
 
     @Override

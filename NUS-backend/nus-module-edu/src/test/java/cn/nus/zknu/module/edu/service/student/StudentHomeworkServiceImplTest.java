@@ -108,7 +108,7 @@ class StudentHomeworkServiceImplTest extends BaseMockitoUnitTest {
         assertEquals(88, detail.getMyScore());
         assertEquals(true, detail.getHistoryOnly());
         assertFalse(detail.getCanSubmit());
-        verify(studentCourseService, never()).validateLevelUnlocked(any(), any(), any());
+        verify(studentCourseService, never()).validateLevelUnlocked(any(), any(), any(), any());
     }
 
     @Test
@@ -363,7 +363,7 @@ class StudentHomeworkServiceImplTest extends BaseMockitoUnitTest {
         when(homeworkMapper.selectById(1L)).thenReturn(homework);
         when(homeworkAssigneeMapper.selectByHomeworkIdAndStudentId(1L, 10L)).thenReturn(new EduHomeworkAssigneeDO());
         doThrow(cn.nus.zknu.framework.common.exception.util.ServiceExceptionUtil.exception(STUDENT_COURSE_LEVEL_LOCKED))
-                .when(studentCourseService).validateLevelUnlocked(10L, 20L, 2);
+                .when(studentCourseService).validateLevelUnlocked(10L, 20L, 2, 0L);
 
         assertServiceException(() -> homeworkService.getHomeworkDetail(10L, 1L), STUDENT_COURSE_LEVEL_LOCKED);
         var request = new cn.nus.zknu.module.edu.controller.admin.student.vo.AppStudentHomeworkSubmitReqVO();
@@ -399,7 +399,7 @@ class StudentHomeworkServiceImplTest extends BaseMockitoUnitTest {
         homeworkService.submitHomework(10L, submit);
 
         verify(homeworkRecordService).updateRecord(any(), eq(10L));
-        verify(studentCourseService, never()).validateLevelUnlocked(any(), any(), any());
+        verify(studentCourseService, never()).validateLevelUnlocked(any(), any(), any(), any());
     }
 
     @Test

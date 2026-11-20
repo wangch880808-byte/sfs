@@ -24,7 +24,9 @@ public class AppStudentUnlockStatusRespVO {
     public static class Level {
         @Schema(description = "等级：1=初级，2=中级，3=高级", example = "2")
         private Integer level;
-        @Schema(description = "等级名称", example = "中级")
+        @Schema(description = "一级指标（技能）编号，0=未填指标", example = "6")
+        private Long indicatorFirstId;
+        @Schema(description = "等级名称（带技能名，如「表达技能 · 中级」）", example = "表达技能 · 中级")
         private String levelName;
         @Schema(description = "分配给学生的该等级任务数", example = "5")
         private Integer totalTasks;
