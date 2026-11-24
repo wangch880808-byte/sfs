@@ -29,7 +29,10 @@
             <artifactId>nus-module-infra</artifactId>
             <version>${revision}</version>
         </dependency>
-
+        <dependency>
+            <groupId>com.drewnoakes</groupId>
+            <artifactId>metadata-extractor</artifactId>
+        </dependency>
         <dependency>
             <groupId>cn.edu.zknu</groupId>
             <artifactId>nus-spring-boot-starter-security</artifactId>

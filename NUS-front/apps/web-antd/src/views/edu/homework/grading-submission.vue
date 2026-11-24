@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import type { EduHomeworkRecordApi } from '#/api/edu/homework-record';
 
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount,ref, watch } from 'vue';
 
 import { ChevronRight, ExternalLink, Eye } from '@vben/icons';
 
@@ -40,6 +40,17 @@ const activeAttachment = ref<AttachmentItem>();
 /** 正在读取、准备预览的附件 */
 const previewingUrl = ref<string>();
 const previewError = ref('');
+const thumbUrls = ref<Record<string, string>>({});
+
+async function loadThumb(item: AttachmentItem) {
+  if (item.kind !== 'image' || thumbUrls.value[item.url]) return;
+  try {
+    const blob = await downloadHomeworkAttachment(item.url);
+    thumbUrls.value[item.url] = URL.createObjectURL(blob);
+  } catch {
+
+  }
+}
 
 function parseAttachmentUrls(value?: string | string[]) {
   if (!value) return [];
@@ -94,6 +105,12 @@ const attachments = computed<AttachmentItem[]>(() =>
 /** 编辑器留下的空段落（<p><br></p>）也按没填写处理 */
 const hasRequirement = computed(() => !isRichHtmlEmpty(props.requirement));
 const hasAnswerContent = computed(() => !isRichHtmlEmpty(props.record.content));
+
+watch(attachments, (list) => list.forEach(loadThumb), { immediate: true });
+
+onBeforeUnmount(() => {
+  Object.values(thumbUrls.value).forEach((url) => URL.revokeObjectURL(url));
+});
 
 async function loadHistory() {
   const recordId = props.record.id;
@@ -217,6 +234,12 @@ function closePreview() {
             type="button"
             @click="handlePreview(item)"
           >
+            <img
+              v-if="item.kind === 'image' && thumbUrls[item.url]"
+              :alt="item.name"
+              :src="thumbUrls[item.url]"
+              class="grading-file__thumb"
+            />
             <span class="grading-file__name">{{ item.name }}</span>
             <span class="grading-file__kind">{{ KIND_LABEL[item.kind] }}</span>
             <span class="grading-file__action">
@@ -304,6 +327,14 @@ function closePreview() {
 
 .grading-disclosure:hover {
   background: var(--nus-bg-hover);
+}
+
+.grading-file__thumb {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: var(--nus-radius-sm);
 }
 
 .grading-disclosure:focus-visible,

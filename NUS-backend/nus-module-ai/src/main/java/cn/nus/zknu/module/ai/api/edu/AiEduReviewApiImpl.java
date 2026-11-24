@@ -19,6 +19,7 @@ import cn.nus.zknu.module.ai.service.model.AiModelService;
 import cn.nus.zknu.module.ai.service.prompt.AiPromptTemplateService;
 import cn.nus.zknu.module.ai.util.AiUtils;
 import cn.nus.zknu.module.ai.util.FileTypeUtils;
+import cn.nus.zknu.module.ai.util.ImageOrientationUtil;
 import cn.nus.zknu.module.infra.api.file.FileApi;
 import cn.nus.zknu.module.infra.api.file.dto.FileContentRespDTO;
 import jakarta.annotation.Resource;
@@ -200,9 +201,9 @@ public class AiEduReviewApiImpl implements AiEduReviewApi {
 
         Prompt prompt = buildGeneratePrompt(systemPrompt, userContent, options);
         return runtimeGuard.executeStream(businessCode, model, req.getBusinessObjectId(),
-                () -> chatModel.stream(prompt)
-                        .map(chunk -> StrUtil.nullToDefault(AiUtils.getChatResponseContent(chunk), ""))
-                        .filter(StrUtil::isNotBlank))
+                        () -> chatModel.stream(prompt)
+                                .map(chunk -> StrUtil.nullToDefault(AiUtils.getChatResponseContent(chunk), ""))
+                                .filter(StrUtil::isNotBlank))
                 .doOnComplete(() -> log.info("[generateCommentStream] finish type={}, modelId={}",
                         req.getType(), model.getId()));
     }
@@ -396,12 +397,13 @@ public class AiEduReviewApiImpl implements AiEduReviewApi {
                     continue;
                 }
                 FileContentRespDTO platformFile = fileApi.getFileContent(url, MAX_REVIEW_IMAGE_BYTES);
-                String mimeType = FileTypeUtils.getMineType(platformFile.getContent(), platformFile.getName());
+                byte[] imageBytes = ImageOrientationUtil.normalize(platformFile.getContent());
+                String mimeType = FileTypeUtils.getMineType(imageBytes, platformFile.getName());
                 if (!FileTypeUtils.isImage(mimeType)) {
                     continue;
                 }
                 MimeType mime = MimeTypeUtils.parseMimeType(mimeType);
-                mediaList.add(new Media(mime, new ByteArrayResource(platformFile.getContent())));
+                mediaList.add(new Media(mime, new ByteArrayResource(imageBytes)));
             }
             return mediaList;
         } catch (Exception ex) {
@@ -409,5 +411,5 @@ public class AiEduReviewApiImpl implements AiEduReviewApi {
             return List.of();
         }
     }
-
 }
+
