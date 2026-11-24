@@ -137,6 +137,21 @@ public class EduStatisticsServiceImpl implements EduStatisticsService {
         resp.setWeekSubmissions(statisticsMapper.selectWeekSubmissions(null));
         resp.setPendingCorrections(statisticsMapper.selectPendingCorrections(null));
         resp.setAiCorrections(statisticsMapper.selectAiCorrections());
+        resp.setTermCount(statisticsMapper.selectTermCount());
+        resp.setOfficialCourseCount(statisticsMapper.selectOfficialCourseCount());
+        resp.setClassCourseCount(statisticsMapper.selectClassCourseCount());
+        resp.setActiveClassCount(statisticsMapper.selectActiveClassCount());
+        List<Map<String, Object>> termRows = statisticsMapper.selectRecentTerms();
+        List<AdminDashboardRespVO.TermSummary> terms = new ArrayList<>();
+        for (Map<String, Object> row : termRows) {
+            AdminDashboardRespVO.TermSummary t = new AdminDashboardRespVO.TermSummary();
+            t.setName((String) row.get("name"));
+            t.setStartsOn(String.valueOf(row.get("startsOn")));
+            t.setEndsOn(String.valueOf(row.get("endsOn")));
+            t.setStatus(row.get("status") != null ? ((Number) row.get("status")).intValue() : 0);
+            terms.add(t);
+        }
+        resp.setRecentTerms(terms);
         if (courseApprover) {
             resp.setPendingPublicAuditCount(statisticsMapper.selectPendingPublicAuditCount());
         }

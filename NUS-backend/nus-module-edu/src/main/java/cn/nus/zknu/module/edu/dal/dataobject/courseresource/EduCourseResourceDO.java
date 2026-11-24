@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.time.LocalDateTime;
+
 /**
  * 课程资源 DO
  */
@@ -41,5 +43,21 @@ public class EduCourseResourceDO extends BaseDO {
      * 标准音频URL（音频文件自动生成）
      */
     private String standardAudioUrl;
+    /**
+     * 审核状态：0 待审核，1 通过，2 拒绝（存量数据默认 1）
+     */
+    private Integer reviewStatus;
+    /**
+     * 审核原因（驳回时填写）
+     */
+    private String reviewReason;
+    /**
+     * 审核人（用户 ID）
+     */
+    private Long reviewerId;
+    /**
+     * 审核时间
+     */
+    private LocalDateTime reviewedAt;
 
 }

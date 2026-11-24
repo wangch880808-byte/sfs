@@ -37,6 +37,7 @@ import GridEmpty from '#/views/system/modules/grid-empty.vue';
 import DeptTree from '#/views/system/user/modules/dept-tree.vue';
 
 import { getDeptNameMap, useGridColumns, useGridFormSchema } from './data';
+import DetailDrawer from './modules/detail-drawer.vue';
 import Form from './modules/form.vue';
 import StudentManageModal from './modules/student-manage-modal.vue';
 
@@ -55,6 +56,9 @@ interface ClassRow extends EduClassApi.Clazz {
 
 const tableTitle = computed(() => '班级列表');
 const searchDeptId = ref<number | undefined>(undefined);
+/** 班级详情抽屉 */
+const detailOpen = ref(false);
+const detailRow = ref<ClassRow | null>(null);
 /** 筛选条件或组织是否生效：决定空状态的写法 */
 const filtered = ref(false);
 /** 封存与恢复的后果 */
@@ -92,6 +96,12 @@ function handleEdit(row: EduClassApi.Clazz) {
 /** 班级学生管理 */
 function handleManageStudents(row: EduClassApi.Clazz) {
   studentManageModalApi.setData(row).open();
+}
+
+/** 班级详情 */
+function handleDetail(row: ClassRow) {
+  detailRow.value = row;
+  detailOpen.value = true;
 }
 
 /** 封存班级 */
@@ -211,6 +221,7 @@ const [Grid, gridApi] = useVbenVxeGrid({
   <Page auto-content-height>
     <FormModal @success="handleRefresh" />
     <StudentManageModalInstance @success="handleRefresh" />
+    <DetailDrawer v-model:open="detailOpen" :row="detailRow" />
 
     <div class="flex h-full w-full">
       <Card
@@ -278,6 +289,14 @@ const [Grid, gridApi] = useVbenVxeGrid({
           <template #actions="{ row }">
             <TableAction
               :actions="[
+                {
+                  label: '详情',
+                  type: 'link',
+                  size: 'small',
+                  icon: 'lucide:eye',
+                  auth: ['edu:class:query'],
+                  onClick: handleDetail.bind(null, row),
+                },
                 {
                   label: '学生管理',
                   type: 'link',

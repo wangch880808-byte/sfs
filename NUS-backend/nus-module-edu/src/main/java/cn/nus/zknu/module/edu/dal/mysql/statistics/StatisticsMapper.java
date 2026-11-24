@@ -69,6 +69,11 @@ public interface StatisticsMapper {
     Long selectTotalCourses();
     Long selectTotalHomeworks();
     Integer selectPendingPublicAuditCount();
+    Long selectTermCount();
+    Long selectOfficialCourseCount();
+    Long selectClassCourseCount();
+    Long selectActiveClassCount();
+    List<Map<String, Object>> selectRecentTerms();
 
     Long selectWeekSubmissions(@Param("teacherId") Long teacherId);
     Long selectPendingCorrections(@Param("teacherId") Long teacherId);

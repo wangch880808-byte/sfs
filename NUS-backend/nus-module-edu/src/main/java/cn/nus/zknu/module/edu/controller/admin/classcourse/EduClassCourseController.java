@@ -194,4 +194,16 @@ public class EduClassCourseController {
         return success(toRespVOList(list));
     }
 
+    /**
+     * 获取教学班运行摘要（P2-4 教学过程分析补教学班视角）。
+     */
+    @GetMapping("/{id}/process-summary")
+    @Operation(summary = "获取教学班运行摘要")
+    @Parameter(name = "id", description = "班课关联 ID", required = true, example = "1")
+    @PreAuthorize("@ss.hasPermission('edu:class-course:query')")
+    public CommonResult<cn.nus.zknu.module.edu.controller.admin.classcourse.vo.ClassCourseProcessSummaryRespVO> getProcessSummary(
+            @PathVariable("id") Long id) {
+        return success(eduClassCourseService.getProcessSummary(id));
+    }
+
 }

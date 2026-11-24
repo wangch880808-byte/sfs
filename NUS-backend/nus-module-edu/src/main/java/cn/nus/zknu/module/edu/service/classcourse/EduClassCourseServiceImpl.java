@@ -13,14 +13,19 @@ import cn.nus.zknu.module.edu.controller.admin.semester.vo.EduSemesterOptionResp
 import cn.nus.zknu.module.edu.dal.dataobject.classcourse.EduClassCourseDO;
 import cn.nus.zknu.module.edu.dal.dataobject.classstudent.EduClassStudentDO;
 import cn.nus.zknu.module.edu.dal.dataobject.clazz.EduClassDO;
+import cn.nus.zknu.module.edu.dal.dataobject.homework.EduHomeworkDO;
+import cn.nus.zknu.module.edu.dal.dataobject.homework.EduHomeworkRecordDO;
 import cn.nus.zknu.module.edu.dal.mysql.classcourse.EduClassCourseMapper;
 import cn.nus.zknu.module.edu.dal.mysql.classstudent.EduClassStudentMapper;
 import cn.nus.zknu.module.edu.dal.mysql.clazz.EduClassMapper;
+import cn.nus.zknu.module.edu.dal.mysql.homework.EduHomeworkMapper;
+import cn.nus.zknu.module.edu.dal.mysql.homework.EduHomeworkRecordMapper;
 import cn.nus.zknu.module.edu.service.dataexchange.EduDataScopeService;
 import cn.nus.zknu.module.edu.service.notification.EduBusinessNotifyService;
 import cn.nus.zknu.module.edu.service.semester.EduSemesterOptionService;
 import cn.nus.zknu.module.edu.util.EduIdCsvUtils;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import cn.nus.zknu.framework.mybatis.core.query.LambdaQueryWrapperX;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -53,6 +58,10 @@ public class EduClassCourseServiceImpl implements EduClassCourseService {
     private EduClassStudentMapper eduClassStudentMapper;
     @Resource
     private EduClassMapper eduClassMapper;
+    @Resource
+    private EduHomeworkMapper eduHomeworkMapper;
+    @Resource
+    private EduHomeworkRecordMapper eduHomeworkRecordMapper;
     @Resource
     private CapacityCourseApi capacityCourseApi;
     @Resource
@@ -462,6 +471,78 @@ public class EduClassCourseServiceImpl implements EduClassCourseService {
         }
         queryWrapper.orderByAsc(EduClassCourseDO::getStatus).orderByDesc(EduClassCourseDO::getId);
         return eduClassCourseMapper.selectList(queryWrapper).stream().findFirst().orElse(null);
+    }
+
+    // ========== P2-4 教学班运行摘要 ==========
+
+    @Override
+    public cn.nus.zknu.module.edu.controller.admin.classcourse.vo.ClassCourseProcessSummaryRespVO getProcessSummary(Long classCourseId) {
+        EduClassCourseDO binding = eduClassCourseMapper.selectById(classCourseId);
+        if (binding == null) {
+            throw new IllegalArgumentException("班课关联不存在");
+        }
+        var resp = new cn.nus.zknu.module.edu.controller.admin.classcourse.vo.ClassCourseProcessSummaryRespVO();
+        // 在班学生数
+        resp.setStudentCount(eduClassStudentMapper.selectCount(
+                new LambdaQueryWrapperX<EduClassStudentDO>()
+                        .eq(EduClassStudentDO::getClassId, binding.getClassId())));
+        // 任课教师数（含助教）
+        resp.setTeacherCount(1L);
+        resp.setBindingStatus(binding.getStatus());
+        // 作业统计
+        List<EduHomeworkDO> homeworks = eduHomeworkMapper.selectList(
+                new LambdaQueryWrapperX<EduHomeworkDO>()
+                        .eq(EduHomeworkDO::getCourseId, binding.getCourseId())
+                        .eq(EduHomeworkDO::getClassId, binding.getClassId())
+                        .in(EduHomeworkDO::getStatus, 1, 2)
+                        .orderByDesc(EduHomeworkDO::getId));
+        resp.setHomeworkCount((long) homeworks.size());
+        List<cn.nus.zknu.module.edu.controller.admin.classcourse.vo.ClassCourseProcessSummaryRespVO.AssignmentStat> assignmentStats = new java.util.ArrayList<>();
+        long totalSubmitted = 0, totalPending = 0;
+        double scoreSum = 0;
+        int scoreCount = 0;
+        for (EduHomeworkDO hw : homeworks) {
+            var stat = new cn.nus.zknu.module.edu.controller.admin.classcourse.vo.ClassCourseProcessSummaryRespVO.AssignmentStat();
+            stat.setHomeworkId(hw.getId());
+            stat.setHomeworkName(hw.getHomeworkName());
+            stat.setDeadline(hw.getDeadline() != null ? hw.getDeadline().toString() : null);
+            stat.setStatus(hw.getStatus());
+            long expected = resp.getStudentCount() != null ? resp.getStudentCount() : 0;
+            long submitted = eduHomeworkRecordMapper.selectCount(
+                    new LambdaQueryWrapperX<EduHomeworkRecordDO>()
+                            .eq(EduHomeworkRecordDO::getHomeworkId, hw.getId())
+                            .in(EduHomeworkRecordDO::getStatus, 1, 2, 4));
+            long graded = eduHomeworkRecordMapper.selectCount(
+                    new LambdaQueryWrapperX<EduHomeworkRecordDO>()
+                            .eq(EduHomeworkRecordDO::getHomeworkId, hw.getId())
+                            .isNotNull(EduHomeworkRecordDO::getScore));
+            // 平均分
+            List<EduHomeworkRecordDO> scoredRecords = eduHomeworkRecordMapper.selectList(
+                    new LambdaQueryWrapperX<EduHomeworkRecordDO>()
+                            .eq(EduHomeworkRecordDO::getHomeworkId, hw.getId())
+                            .isNotNull(EduHomeworkRecordDO::getScore));
+            double avgScore = 0;
+            if (!scoredRecords.isEmpty()) {
+                avgScore = scoredRecords.stream().mapToInt(EduHomeworkRecordDO::getScore).average().orElse(0);
+            }
+            stat.setExpectedCount(expected);
+            stat.setSubmittedCount(submitted);
+            stat.setGradedCount(graded);
+            stat.setAverageScore(avgScore);
+            stat.setCompletionRate(expected > 0 ? Math.round(submitted * 10000.0 / expected) / 100.0 : 0);
+            assignmentStats.add(stat);
+            totalSubmitted += submitted;
+            totalPending += (submitted - graded);
+            if (!scoredRecords.isEmpty()) {
+                scoreSum += avgScore * scoredRecords.size();
+                scoreCount += scoredRecords.size();
+            }
+        }
+        resp.setAssignments(assignmentStats);
+        resp.setSubmittedCount(totalSubmitted);
+        resp.setPendingGradingCount(Math.max(0, totalPending));
+        resp.setAverageScore(scoreCount > 0 ? Math.round(scoreSum / scoreCount * 100) / 100.0 : null);
+        return resp;
     }
 
 }

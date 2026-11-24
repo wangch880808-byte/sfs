@@ -5,11 +5,13 @@ import cn.nus.zknu.framework.common.pojo.PageResult;
 import cn.nus.zknu.framework.common.util.object.BeanUtils;
 import cn.nus.zknu.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.nus.zknu.module.edu.controller.admin.courseresource.vo.EduCourseResourcePageReqVO;
+import cn.nus.zknu.module.edu.controller.admin.courseresource.vo.EduCourseResourceReviewReqVO;
 import cn.nus.zknu.module.edu.controller.admin.courseresource.vo.EduCourseResourceSaveReqVO;
 import cn.nus.zknu.module.edu.dal.dataobject.courseresource.EduCourseResourceDO;
 import cn.nus.zknu.module.edu.dal.mysql.courseresource.EduCourseResourceMapper;
 import cn.nus.zknu.module.infra.api.file.FileApi;
 import cn.nus.zknu.module.infra.api.file.dto.FileContentRespDTO;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xslf.usermodel.XMLSlideShow;
@@ -19,6 +21,7 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -107,6 +110,8 @@ public class EduCourseResourceServiceImpl implements EduCourseResourceService {
         resource.setFileUrl(StrUtil.blankToDefault(file.getUrl(), createReqVO.getFileUrl()));
         resource.setFileSize(fileSize);
         resource.setFileType(normalizedFileType);
+        // 新上传的资源进入待审核状态
+        resource.setReviewStatus(0);
         eduCourseResourceMapper.insert(resource);
         return resource.getId();
     }
@@ -158,6 +163,37 @@ public class EduCourseResourceServiceImpl implements EduCourseResourceService {
         } catch (Exception ex) {
             log.warn("[getResourcePreviewText][id({}) fileUrl({}) 预览提取失败]", id, resource.getFileUrl(), ex);
             return "";
+        }
+    }
+
+    @Override
+    public PageResult<EduCourseResourceDO> getReviewPage(EduCourseResourcePageReqVO reqVO) {
+        return eduCourseResourceMapper.selectPage(reqVO, new LambdaQueryWrapperX<EduCourseResourceDO>()
+                .eq(EduCourseResourceDO::getReviewStatus, 0)
+                .eqIfPresent(EduCourseResourceDO::getCourseId, reqVO.getCourseId())
+                .likeIfPresent(EduCourseResourceDO::getResourceName, reqVO.getResourceName())
+                .eqIfPresent(EduCourseResourceDO::getFileType, reqVO.getFileType())
+                .orderByDesc(EduCourseResourceDO::getId));
+    }
+
+    @Override
+    public void reviewResource(Long id, EduCourseResourceReviewReqVO reqVO) {
+        validateResourceExists(id);
+        boolean approved = Boolean.TRUE.equals(reqVO.getApproved());
+        if (!approved && StrUtil.isBlank(reqVO.getReason())) {
+            throw exception(COURSE_RESOURCE_REVIEW_REJECT_REASON_REQUIRED);
+        }
+        EduCourseResourceDO update = new EduCourseResourceDO();
+        update.setReviewStatus(approved ? 1 : 2);
+        update.setReviewReason(approved ? null : StrUtil.trim(reqVO.getReason()));
+        update.setReviewerId(getLoginUserId());
+        update.setReviewedAt(LocalDateTime.now());
+        // 条件更新防止并发重复审核：仅待审核状态可被审核
+        int rows = eduCourseResourceMapper.update(update, new LambdaUpdateWrapper<EduCourseResourceDO>()
+                .eq(EduCourseResourceDO::getId, id)
+                .eq(EduCourseResourceDO::getReviewStatus, 0));
+        if (rows == 0) {
+            throw exception(COURSE_RESOURCE_REVIEW_STATE_CHANGED);
         }
     }
 

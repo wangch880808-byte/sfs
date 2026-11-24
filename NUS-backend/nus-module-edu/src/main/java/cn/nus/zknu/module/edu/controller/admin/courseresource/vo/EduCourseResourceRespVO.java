@@ -30,6 +30,18 @@ public class EduCourseResourceRespVO {
     @Schema(description = "标准音频URL", example = "https://oss.example.com/audio.mp3")
     private String standardAudioUrl;
 
+    @Schema(description = "审核状态：0 待审核，1 通过，2 拒绝", example = "0")
+    private Integer reviewStatus;
+
+    @Schema(description = "审核原因（驳回时填写）", example = "内容不合规")
+    private String reviewReason;
+
+    @Schema(description = "审核人 ID", example = "1024")
+    private Long reviewerId;
+
+    @Schema(description = "审核时间")
+    private LocalDateTime reviewedAt;
+
     @Schema(description = "创建时间", requiredMode = Schema.RequiredMode.REQUIRED)
     private LocalDateTime createTime;
 

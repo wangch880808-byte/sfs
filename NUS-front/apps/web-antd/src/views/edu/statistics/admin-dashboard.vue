@@ -84,6 +84,34 @@ const metrics = computed(() => {
       unit: '项',
       value: data?.totalHomeworks,
     },
+    {
+      key: 'terms',
+      label: '学期',
+      meta: '全部学期',
+      unit: '个',
+      value: data?.termCount,
+    },
+    {
+      key: 'officialCourses',
+      label: '正式课程',
+      meta: '目录中在用',
+      unit: '门',
+      value: data?.officialCourseCount,
+    },
+    {
+      key: 'classCourses',
+      label: '教学班',
+      meta: '在用班课关联',
+      unit: '个',
+      value: data?.classCourseCount,
+    },
+    {
+      key: 'activeClasses',
+      label: '活跃班级',
+      meta: '在用状态',
+      unit: '个',
+      value: data?.activeClassCount,
+    },
   ];
 });
 
@@ -107,6 +135,9 @@ const attentionState = computed(() =>
   combinePanelState(attentionSources.value),
 );
 const summaryState = computed(() => combinePanelState([summary]));
+const recentTerms = computed(
+  () => summary.data.value?.recentTerms ?? [],
+);
 
 function retryAttention() {
   return Promise.all(attentionSources.value.map((source) => source.load()));
@@ -150,6 +181,44 @@ function retryAttention() {
         :loading="attentionState.loading"
         @retry="retryAttention"
       />
+    </div>
+
+    <!-- 最近学期列表（V1.0.1.11 对齐师范生口径） -->
+    <div v-if="recentTerms.length > 0" class="mt-6">
+      <h3 class="mb-2 text-base font-medium">最近学期</h3>
+      <table class="w-full border-collapse text-sm">
+        <thead>
+          <tr class="border-b border-gray-200 text-left text-gray-500">
+            <th class="px-3 py-2">学期名称</th>
+            <th class="px-3 py-2">开始日期</th>
+            <th class="px-3 py-2">结束日期</th>
+            <th class="px-3 py-2">状态</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="term in recentTerms"
+            :key="term.name"
+            class="border-b border-gray-100"
+          >
+            <td class="px-3 py-2">{{ term.name }}</td>
+            <td class="px-3 py-2">{{ term.startsOn }}</td>
+            <td class="px-3 py-2">{{ term.endsOn }}</td>
+            <td class="px-3 py-2">
+              <span
+                class="rounded px-2 py-0.5 text-xs"
+                :class="{
+                  'bg-green-100 text-green-700': term.status === 1,
+                  'bg-gray-100 text-gray-500': term.status === 0,
+                  'bg-orange-100 text-orange-700': term.status === 2,
+                }"
+              >
+                {{ ['待启用', '启用', '归档'][term.status] ?? '未知' }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </Page>
 </template>

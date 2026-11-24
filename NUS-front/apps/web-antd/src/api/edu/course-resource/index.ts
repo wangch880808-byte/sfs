@@ -21,6 +21,12 @@ export namespace EduCourseResourceApi {
     fileSize: number;
     standardAudioUrl?: string;
     createTime?: Date | string;
+    /** 审核状态：0 待审核，1 通过，2 拒绝 */
+    reviewStatus?: number;
+    /** 审核原因（驳回时填写） */
+    reviewReason?: string;
+    reviewerId?: number;
+    reviewedAt?: Date | string;
   }
 
   /** 课程资源创建请求 */
@@ -31,6 +37,12 @@ export namespace EduCourseResourceApi {
     fileType: string;
     fileSize: number;
     standardAudioUrl?: string;
+  }
+
+  /** 课程资源审核请求 */
+  export interface CourseResourceReviewReqVO {
+    approved: boolean;
+    reason?: string;
   }
 }
 
@@ -128,4 +140,28 @@ export function getCourseResourcePreviewText(id: number) {
   return requestClient.get<string>(
     `/edu/course-resource/preview-text?id=${id}`,
   );
+}
+
+/** 查询待审核课程资源分页（reviewStatus=0） */
+export function getCourseResourceReviewPage(params: {
+  courseId?: number;
+  fileType?: string;
+  pageNo?: number;
+  pageSize?: number;
+  resourceName?: string;
+}) {
+  return requestClient.get<{
+    list: EduCourseResourceApi.CourseResource[];
+    total: number;
+  }>('/edu/course-resource/review/page', {
+    params: { pageNo: 1, pageSize: 20, ...params },
+  });
+}
+
+/** 审核课程资源（通过 / 驳回） */
+export function reviewCourseResource(
+  id: number,
+  data: EduCourseResourceApi.CourseResourceReviewReqVO,
+) {
+  return requestClient.post<boolean>(`/edu/course-resource/${id}/review`, data);
 }

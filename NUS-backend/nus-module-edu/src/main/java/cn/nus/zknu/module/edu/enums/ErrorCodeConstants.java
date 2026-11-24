@@ -33,6 +33,8 @@ public interface ErrorCodeConstants {
     ErrorCode COURSE_RESOURCE_FILE_TYPE_NOT_ALLOWED = new ErrorCode(1_050_003_001, "不支持的文件类型");
     ErrorCode COURSE_RESOURCE_FILE_SIZE_EXCEED = new ErrorCode(1_050_003_002, "文件大小超过 500 MB 限制");
     ErrorCode COURSE_RESOURCE_FILE_INVALID = new ErrorCode(1_050_003_003, "课程资源文件不合法：{}");
+    ErrorCode COURSE_RESOURCE_REVIEW_STATE_CHANGED = new ErrorCode(1_050_003_004, "该资源已被审核，请刷新后查看");
+    ErrorCode COURSE_RESOURCE_REVIEW_REJECT_REASON_REQUIRED = new ErrorCode(1_050_003_005, "驳回资源时必须填写原因");
 
     // ========== 实训任务模块 1-050-004-000 ==========
     ErrorCode HOMEWORK_NOT_EXISTS = new ErrorCode(1_050_004_000, "实训任务不存在");
@@ -209,5 +211,9 @@ public interface ErrorCodeConstants {
             "学期收尾没有完成：有班级课程不属于学期「{}」或已经封存。刷新预览后重新选择。");
     ErrorCode SEMESTER_WRAP_UP_CLASS_INVALID = new ErrorCode(1_050_018_012,
             "学期收尾没有完成：有班级在其他学期还有班级课程，不能整体封存。刷新预览后重新选择。");
+
+    // ========== 建班申请模块 1-050-019-000 ==========
+    ErrorCode CLASS_REQUEST_NOT_EXISTS = new ErrorCode(1_050_019_000, "建班申请不存在");
+    ErrorCode CLASS_REQUEST_ALREADY_REVIEWED = new ErrorCode(1_050_019_001, "该申请已审核，请刷新后查看");
 
 }

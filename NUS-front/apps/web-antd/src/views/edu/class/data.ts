@@ -236,7 +236,7 @@ export function useGridFormSchema(): VbenFormSchema[] {
 }
 
 /** 班级列表操作列宽度 */
-export const CLASS_ACTION_COLUMN_WIDTH = 210;
+export const CLASS_ACTION_COLUMN_WIDTH = 280;
 
 /** 列表的字段 */
 export function useGridColumns(): VxeTableGridOptions['columns'] {
@@ -291,7 +291,7 @@ export function useGridColumns(): VxeTableGridOptions['columns'] {
       formatter: 'formatDateTime',
     },
     {
-      // 三个小号链接按钮（学生管理、编辑、封存）正好放下；1440 宽时其余列靠横向滚动，固定列左侧有阴影提示
+      // 四个小号链接按钮（详情、学生管理、编辑、封存）正好放下；1440 宽时其余列靠横向滚动，固定列左侧有阴影提示
       title: '操作',
       width: CLASS_ACTION_COLUMN_WIDTH,
       fixed: 'right',

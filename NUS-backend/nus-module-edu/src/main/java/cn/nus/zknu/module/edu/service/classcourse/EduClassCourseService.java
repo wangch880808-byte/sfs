@@ -56,4 +56,12 @@ public interface EduClassCourseService {
         return listByCourse(courseId, false);
     }
 
+    /**
+     * 获取教学班运行摘要（P2-4 教学过程分析补教学班视角）
+     *
+     * @param classCourseId 班课关联 ID
+     * @return 运行摘要（含作业完成表）
+     */
+    cn.nus.zknu.module.edu.controller.admin.classcourse.vo.ClassCourseProcessSummaryRespVO getProcessSummary(Long classCourseId);
+
 }

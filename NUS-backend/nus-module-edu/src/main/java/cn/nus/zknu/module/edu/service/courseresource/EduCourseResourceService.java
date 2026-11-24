@@ -2,6 +2,7 @@ package cn.nus.zknu.module.edu.service.courseresource;
 
 import cn.nus.zknu.framework.common.pojo.PageResult;
 import cn.nus.zknu.module.edu.controller.admin.courseresource.vo.EduCourseResourcePageReqVO;
+import cn.nus.zknu.module.edu.controller.admin.courseresource.vo.EduCourseResourceReviewReqVO;
 import cn.nus.zknu.module.edu.controller.admin.courseresource.vo.EduCourseResourceSaveReqVO;
 import cn.nus.zknu.module.edu.dal.dataobject.courseresource.EduCourseResourceDO;
 
@@ -48,5 +49,21 @@ public interface EduCourseResourceService {
      * @return 文本预览内容
      */
     String getResourcePreviewText(Long id);
+
+    /**
+     * 分页查询待审核课程资源（reviewStatus = 0）
+     *
+     * @param reqVO 分页请求
+     * @return 分页结果
+     */
+    PageResult<EduCourseResourceDO> getReviewPage(EduCourseResourcePageReqVO reqVO);
+
+    /**
+     * 审核课程资源（条件更新 reviewStatus = 0 防止重复审核）
+     *
+     * @param id     资源 ID
+     * @param reqVO  审核结果（approved + reason）
+     */
+    void reviewResource(Long id, EduCourseResourceReviewReqVO reqVO);
 
 }

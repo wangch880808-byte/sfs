@@ -353,6 +353,33 @@
         SELECT COUNT(*) FROM edu_homework h WHERE h.deleted = 0 AND h.status IN (1, 2) <include refid="visibleHomeworkScope"/>
     </select>
 
+    <!-- 管理员看板：学期总数（V1.0.1.11 对齐师范生口径） -->
+    <select id="selectTermCount" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM edu_term WHERE deleted = 0
+    </select>
+
+    <!-- 管理员看板：正式课程目录数 -->
+    <select id="selectOfficialCourseCount" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM edu_official_course WHERE deleted = 0 AND status = 0
+    </select>
+
+    <!-- 管理员看板：教学班（班课关联）数 -->
+    <select id="selectClassCourseCount" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM edu_class_course WHERE deleted = 0 AND status = 0
+    </select>
+
+    <!-- 管理员看板：活跃班级数 -->
+    <select id="selectActiveClassCount" resultType="java.lang.Long">
+        SELECT COUNT(*) FROM edu_class WHERE deleted = 0 AND status = 0
+    </select>
+
+    <!-- 管理员看板：最近学期列表 -->
+    <select id="selectRecentTerms" resultType="java.util.Map">
+        SELECT name, starts_on AS startsOn, ends_on AS endsOn, status
+        FROM edu_term WHERE deleted = 0
+        ORDER BY starts_on DESC LIMIT 5
+    </select>
+
     <!-- 重交会刷新 submit_time，create_time 才能保持原有首次创建口径。 -->
     <select id="selectWeekSubmissions" resultType="java.lang.Long">
         SELECT COUNT(*) FROM edu_homework_record hr

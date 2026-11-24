@@ -81,6 +81,24 @@ export namespace StatisticsApi {
     aiCorrections: number;
     /** 待审批的公共课申请数；当前用户没有公共课审批权限时为 null（不显示这一项） */
     pendingPublicAuditCount: null | number;
+    /** 学期总数 */
+    termCount: number;
+    /** 正式课程目录数 */
+    officialCourseCount: number;
+    /** 教学班（班课关联）数 */
+    classCourseCount: number;
+    /** 活跃班级数 */
+    activeClassCount: number;
+    /** 最近学期列表 */
+    recentTerms: TermSummary[];
+  }
+
+  /** 学期摘要（管理总览用） */
+  export interface TermSummary {
+    name: string;
+    startsOn: string;
+    endsOn: string;
+    status: number;
   }
 
   /** 教师工作台最近实训任务项 */
@@ -261,6 +279,18 @@ function normalizeAdminDashboard(
       payload?.pendingPublicAuditCount === undefined
         ? null
         : Number(payload.pendingPublicAuditCount) || 0,
+    termCount: Number(payload?.termCount ?? 0),
+    officialCourseCount: Number(payload?.officialCourseCount ?? 0),
+    classCourseCount: Number(payload?.classCourseCount ?? 0),
+    activeClassCount: Number(payload?.activeClassCount ?? 0),
+    recentTerms: Array.isArray(payload?.recentTerms)
+      ? payload.recentTerms.map((t: any) => ({
+          name: String(t?.name ?? ''),
+          startsOn: String(t?.startsOn ?? ''),
+          endsOn: String(t?.endsOn ?? ''),
+          status: Number(t?.status ?? 0),
+        }))
+      : [],
   };
 }
 
